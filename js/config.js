@@ -15,7 +15,7 @@ const CONFIG = {
 
   // ── GOOGLE SHEETS ───────────────────────────────────────
   sheetId: "1UXaZTSf5as2RS45esEXyI0x8oRe5ATZCpCPIOHqXrNc",
-  sheetApiBase: "https://script.google.com/macros/s/YOUR_WEBAPP_ID/exec",
+  sheetApiBase: "https://script.google.com/macros/s/AKfycbxuOOgmFIPaHTqsiVEjXA7q6YhuFb6S8Rv7nKQQv2NSrW9DEWqtU7eHQZy2rmHDuGaNWg/exec",
 
   // ── DEUDAS ACTUALES ─────────────────────────────────────
   debts: {
