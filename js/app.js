@@ -18,8 +18,8 @@ function checkAuth() {
 async function init() {
   if (!checkAuth()) return;
 
-  // Cargar último estado guardado antes de renderizar
   await loadSavedState();
+  await loadExtraordinaryIncome();
 
   set("last-updated", new Date().toLocaleDateString("es-MX", {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
@@ -27,6 +27,7 @@ async function init() {
 
   renderCounters();
   renderDebtCards();
+  renderExtraordinaryIncome();
   renderMonthlyPlan();
   renderSubscriptions();
   renderTimeline();
@@ -381,8 +382,7 @@ async function loadHistory() {
 
 // ── EVENTOS ───────────────────────────────────────────────
 function bindEvents() {
-
-  // Abrir edición inline
+  // Abrir edición inline deudas
   document.addEventListener("click", function(e) {
     if (!e.target.classList.contains("btn-edit")) return;
     var key = e.target.dataset.key;
@@ -393,52 +393,41 @@ function bindEvents() {
     if (inp) { inp.focus(); inp.select(); }
   });
 
-  // Cancelar
   document.addEventListener("click", function(e) {
     if (!e.target.classList.contains("btn-cancel")) return;
+    if (e.target.classList.contains("ei-cancel")) return; // manejado por bindEIEvents
     closeEdit(e.target.dataset.key);
   });
 
-  // Guardar con botón
   document.addEventListener("click", function(e) {
     if (!e.target.classList.contains("btn-save")) return;
+    if (e.target.classList.contains("ei-save")) return; // manejado por bindEIEvents
     saveDebt(e.target.dataset.key);
   });
 
-  // Guardar con Enter
   document.addEventListener("keydown", function(e) {
     if (e.key !== "Enter") return;
     if (!e.target.classList.contains("debt-input")) return;
     var key = e.target.id.replace("inp-","").replace("note-","");
+    if (key.startsWith("ei-")) return;
     saveDebt(key);
   });
 
-  // Revertir
   var btnRev = document.getElementById("btn-revert");
   if (btnRev) btnRev.addEventListener("click", async function() {
     if (!confirm("¿Revertir al snapshot anterior?")) return;
     var r = await SHEETS.revertLast();
     showToast(r.success ? "✅ Revertido" : "❌ Error al revertir");
-    if (r.success) await loadHistory();
+    if (r.success) { sessionStorage.removeItem("debt_state"); await loadSavedState(); renderCounters(); renderDebtCards(); await loadHistory(); }
   });
 
-  // Sync
   var btnSync = document.getElementById("btn-sync");
   if (btnSync) btnSync.addEventListener("click", async function() {
     var r = await SHEETS.syncPending();
     showToast("✅ Sync: " + r.synced + " · Pendientes: " + r.remaining);
   });
 
-  // Escenarios
-  var tp = document.getElementById("toggle-partner");
-  if (tp) tp.addEventListener("change", function(e) {
-    document.getElementById("partner-scenario").style.display = e.target.checked ? "block" : "none";
-  });
-
-  var ta = document.getElementById("toggle-airbnb");
-  if (ta) ta.addEventListener("change", function(e) {
-    document.getElementById("airbnb-scenario").style.display = e.target.checked ? "block" : "none";
-  });
+  bindEIEvents();
 }
 
 // ── HELPERS EDICIÓN ───────────────────────────────────────
@@ -498,11 +487,17 @@ async function saveDebt(key) {
 function fmt(n) {
   return new Intl.NumberFormat("es-MX", {style:"currency",currency:"MXN",maximumFractionDigits:0}).format(n);
 }
-function set(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
-function setStyle(id, prop, val) { var el = document.getElementById(id); if (el) el.style[prop] = val; }
-function badge(color, text) {
-  return '<span class="badge badge--' + color + '">' + text + '</span>';
+function fmtDate(d) {
+  if (!d) return "—";
+  var parts = d.split("-");
+  var months = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  return (parts[2]||"") + " " + (months[parseInt(parts[1])-1]||"") + " " + (parts[0]||"");
 }
+function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ""; }
+function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+function setStyle(id, p, v) { var el = document.getElementById(id); if (el) el.style[p] = v; }
+function badge(color, text) { return '<span class="badge badge--'+color+'">'+text+'</span>'; }
+function escHtml(s) { return s.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
 function showToast(msg) {
   var t = document.getElementById("toast");
   if (!t) return;
