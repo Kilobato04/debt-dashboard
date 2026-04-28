@@ -68,6 +68,15 @@ const SHEETS = {
     });
   },
 
+  async saveExtraordinaryIncome(items) {
+    return this._post({
+      action: "saveExtraordinaryIncome",
+      token: CONFIG.appToken,
+      timestamp: new Date().toISOString(),
+      data: { items: items }
+    });
+  },
+
   async revertLast() {
     return this._post({
       action: "revertLast",
