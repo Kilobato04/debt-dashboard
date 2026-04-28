@@ -114,6 +114,10 @@ h2{font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--te
 .budget-summary__row{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-sub);}
 .budget-summary__row--total{font-weight:700;font-size:.8rem;margin-top:.25rem;padding-top:.4rem;border-top:1px solid var(--border);}
 
+.budget-mins{margin-top:.875rem;padding-top:.75rem;border-top:1px solid var(--border);}
+.budget-mins__title{font-size:.63rem;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:.4rem;}
+.budget-summary__formula{font-size:.62rem;color:var(--text-muted);margin-top:.4rem;font-style:italic;}
+
 /* SUBS TABLE */
 .subs-table{width:100%;border-collapse:collapse;font-size:.7rem;}
 .subs-table th{text-align:left;color:var(--text-sub);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:500;}
