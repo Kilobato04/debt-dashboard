@@ -18,6 +18,9 @@ function checkAuth() {
 async function init() {
   if (!checkAuth()) return;
 
+  // Cargar último estado guardado antes de renderizar
+  await loadSavedState();
+
   set("last-updated", new Date().toLocaleDateString("es-MX", {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
   }));
@@ -30,6 +33,71 @@ async function init() {
   await loadHistory();
   bindEvents();
   SHEETS.syncPending();
+}
+
+// ── CARGAR ESTADO GUARDADO DESDE SHEETS ───────────────────
+async function loadSavedState() {
+  try {
+    // 1. Intentar cargar desde sessionStorage primero (más rápido)
+    var cached = sessionStorage.getItem("debt_state");
+    if (cached) {
+      applyState(JSON.parse(cached));
+      // Luego actualizar en background desde Sheets
+      loadFromSheets();
+      return;
+    }
+    // 2. Si no hay cache, cargar directo desde Sheets
+    await loadFromSheets();
+  } catch(err) {
+    console.warn("loadSavedState error:", err.message);
+  }
+}
+
+async function loadFromSheets() {
+  try {
+    var result = await SHEETS.getHistory("monthly_snapshots");
+    if (!result.success || !result.data || !result.data.length) return;
+
+    // Tomar el snapshot más reciente
+    var latest = result.data[result.data.length - 1];
+    if (!latest) return;
+
+    var state = {
+      banorte:       parseFloat(latest.banorte)       || CONFIG.debts.banorte.balance,
+      banamexNomina: parseFloat(latest.banamexNomina) || CONFIG.debts.banamexNomina.balance,
+      banamexTDC:    parseFloat(latest.banamexTDC)    || CONFIG.debts.banamexTDC.balance,
+      nu:            parseFloat(latest.nu)            || CONFIG.debts.nu.balance,
+      savedAt:       latest.timestamp || "",
+      notes:         latest.notes || ""
+    };
+
+    applyState(state);
+
+    // Guardar en sessionStorage como cache
+    sessionStorage.setItem("debt_state", JSON.stringify(state));
+
+    // Actualizar timestamp con la fecha del último guardado
+    if (state.savedAt) {
+      var d = new Date(state.savedAt);
+      set("last-updated", d.toLocaleDateString("es-MX", {
+        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+      }));
+    }
+
+    // Re-renderizar con los datos actualizados
+    renderCounters();
+    renderDebtCards();
+
+  } catch(err) {
+    console.warn("loadFromSheets error:", err.message);
+  }
+}
+
+function applyState(state) {
+  if (state.banorte       != null) CONFIG.debts.banorte.balance       = state.banorte;
+  if (state.banamexNomina != null) CONFIG.debts.banamexNomina.balance = state.banamexNomina;
+  if (state.banamexTDC    != null) CONFIG.debts.banamexTDC.balance    = state.banamexTDC;
+  if (state.nu            != null) CONFIG.debts.nu.balance            = state.nu;
 }
 
 // ── COUNTERS ──────────────────────────────────────────────
@@ -390,21 +458,39 @@ async function saveDebt(key) {
   var notes = noteEl ? noteEl.value : "";
   var old = CONFIG.debts[key].balance;
 
+  // Actualizar en memoria
   CONFIG.debts[key].balance = newBal;
 
+  // Actualizar display inmediatamente
   var balEl = document.getElementById("bal-" + key);
   if (balEl) balEl.textContent = fmt(newBal);
 
   closeEdit(key);
   showToast("⏳ Guardando...");
 
+  // Guardar en Sheets
   await SHEETS.updateDebt(key, newBal, key + ": $" + old + " → $" + newBal + (notes ? ". " + notes : ""));
-  await SHEETS.saveSnapshot({ notes: "Actualización " + key });
+  await SHEETS.saveSnapshot({ notes: "Actualización " + key + (notes ? ": " + notes : "") });
+
+  // Invalidar cache de sessionStorage para que el próximo refresh cargue desde Sheets
+  sessionStorage.removeItem("debt_state");
+
+  // Guardar nuevo estado en sessionStorage
+  var newState = {
+    banorte:       CONFIG.debts.banorte.balance,
+    banamexNomina: CONFIG.debts.banamexNomina.balance,
+    banamexTDC:    CONFIG.debts.banamexTDC.balance,
+    nu:            CONFIG.debts.nu.balance,
+    savedAt:       new Date().toISOString(),
+    notes:         notes
+  };
+  sessionStorage.setItem("debt_state", JSON.stringify(newState));
 
   renderCounters();
   renderDebtCards();
 
-  set("last-updated", new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}));
+  var ts = new Date().toLocaleDateString("es-MX", {day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"});
+  set("last-updated", ts);
   showToast("✅ " + CONFIG.debts[key].label + " actualizado");
 }
 
