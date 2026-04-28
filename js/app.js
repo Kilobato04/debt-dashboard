@@ -73,17 +73,44 @@ function renderDebtCards() {
 
     const card = document.createElement("div");
     card.className = `debt-card debt-card--${semaforo}`;
+    card.dataset.key = key;
     card.innerHTML = `
       <div class="debt-card__header">
         <span class="debt-card__label">${debt.label}</span>
         <span class="debt-card__dot debt-card__dot--${semaforo}"></span>
       </div>
-      <div class="debt-card__balance">${isFloat ? "~" : ""}${fmt(debt.balance)}</div>
-      ${debt.rate > 0 ? `<div class="debt-card__rate">${debt.rate}% anual · <span class="text-red">${fmt(interest)}/mes interés</span></div>` : ""}
+      <div class="debt-card__balance" id="balance-display-${key}">
+        ${isFloat ? "~" : ""}${fmt(debt.balance)}
+      </div>
+
+      <!-- Inline edit form (oculto por defecto) -->
+      <div class="debt-card__edit" id="edit-${key}" style="display:none;">
+        <input
+          class="debt-card__input"
+          id="input-${key}"
+          type="number"
+          value="${debt.balance}"
+          step="1"
+          min="0"
+          placeholder="Nuevo saldo"
+        >
+        <input
+          class="debt-card__input debt-card__input--note"
+          id="note-${key}"
+          type="text"
+          placeholder="Nota (opcional)"
+        >
+        <div class="debt-card__edit-actions">
+          <button class="btn-save" data-key="${key}">Guardar</button>
+          <button class="btn-cancel" data-key="${key}">Cancelar</button>
+        </div>
+      </div>
+
+      ${debt.rate > 0 ? `<div class="debt-card__rate">${debt.rate}% anual · <span class="text-red">${fmt(interest)}/mes</span></div>` : ""}
       ${debt.minPayment > 0 ? `<div class="debt-card__min">Mín: ${fmt(debt.minPayment)}</div>` : ""}
       ${utilPct !== null ? `<div class="debt-card__util">Utilización: ${utilPct}%</div>` : ""}
-      ${isFloat ? `<div class="debt-card__note">Float corriente — no es deuda estructural</div>` : ""}
-      <button class="btn-update" data-key="${key}">Actualizar saldo</button>
+      ${isFloat ? `<div class="debt-card__note">Float corriente</div>` : ""}
+      <button class="btn-update" data-key="${key}">Editar saldo</button>
     `;
     container.appendChild(card);
   });
@@ -348,45 +375,48 @@ async function loadAndRenderHistory() {
 
 // ── EVENTOS ───────────────────────────────────────────────
 function bindEvents() {
-  // Actualizar saldo de deuda
-  document.addEventListener("click", async e => {
+
+  // Mostrar form inline al hacer clic en "Editar saldo"
+  document.addEventListener("click", e => {
     if (!e.target.classList.contains("btn-update")) return;
     const key = e.target.dataset.key;
-    const debt = CONFIG.debts[key];
-    if (!debt) return;
-    const val = prompt(`Nuevo saldo para ${debt.label} (actual: ${fmt(debt.balance)}):`);
-    if (!val || isNaN(+val)) return;
-    const newBalance = +val;
-    const notes = prompt("Nota (opcional):") || "";
-
-    // Actualizar config en memoria
-    CONFIG.debts[key].balance = newBalance;
-
-    // Guardar en Sheets
-    const res = await SHEETS.updateDebt(key, newBalance, notes);
-    await SHEETS.saveSnapshot({
-      date: new Date().toISOString().split('T')[0],
-      banorte: CONFIG.debts.banorte.balance,
-      banamexNomina: CONFIG.debts.banamexNomina.balance,
-      banamexTDC: CONFIG.debts.banamexTDC.balance,
-      nu: CONFIG.debts.nu.balance,
-      totalDebt: CALC.totalDebt(),
-      notes
-    });
-
-    // Re-render
-    renderCounters();
-    renderDebtCards();
-
-    const msg = res.success ? "✅ Saldo actualizado y guardado" : "⚠️ Guardado localmente (sin conexión)";
-    showToast(msg);
+    const editEl = document.getElementById(`edit-${key}`);
+    const displayEl = document.getElementById(`balance-display-${key}`);
+    if (!editEl) return;
+    editEl.style.display = "block";
+    displayEl.style.display = "none";
+    e.target.style.display = "none";
+    document.getElementById(`input-${key}`)?.focus();
   });
 
-  // Revertir último cambio
+  // Cancelar edición
+  document.addEventListener("click", e => {
+    if (!e.target.classList.contains("btn-cancel")) return;
+    const key = e.target.dataset.key;
+    _closeEdit(key);
+  });
+
+  // Guardar desde botón
+  document.addEventListener("click", async e => {
+    if (!e.target.classList.contains("btn-save")) return;
+    const key = e.target.dataset.key;
+    await _saveDebt(key);
+  });
+
+  // Guardar con Enter en el input
+  document.addEventListener("keydown", async e => {
+    if (e.key !== "Enter") return;
+    const input = e.target;
+    if (!input.classList.contains("debt-card__input")) return;
+    const key = input.id.replace("input-", "").replace("note-", "");
+    await _saveDebt(key);
+  });
+
+  // Revertir
   document.getElementById("btn-revert")?.addEventListener("click", async () => {
     if (!confirm("¿Revertir al snapshot anterior?")) return;
     const res = await SHEETS.revertLast();
-    showToast(res.success ? "✅ Revertido al estado anterior" : "❌ Error al revertir");
+    showToast(res.success ? "✅ Revertido" : "❌ Error al revertir");
     if (res.success) await loadAndRenderHistory();
   });
 
@@ -396,17 +426,74 @@ function bindEvents() {
     showToast(`✅ Sincronizados: ${res.synced} · Pendientes: ${res.remaining}`);
   });
 
-  // Escenario pareja toggle
+  // Escenarios toggle
   document.getElementById("toggle-partner")?.addEventListener("change", e => {
-    CONFIG.scenarioPartner.enabled = e.target.checked;
     document.getElementById("partner-scenario").style.display = e.target.checked ? "block" : "none";
   });
 
-  // Escenario Airbnb toggle
   document.getElementById("toggle-airbnb")?.addEventListener("change", e => {
-    CONFIG.airbnb.enabled = e.target.checked;
     document.getElementById("airbnb-scenario").style.display = e.target.checked ? "block" : "none";
   });
+}
+
+// ── HELPERS DE EDICIÓN ────────────────────────────────────
+function _closeEdit(key) {
+  const editEl = document.getElementById(`edit-${key}`);
+  const displayEl = document.getElementById(`balance-display-${key}`);
+  const btn = document.querySelector(`.btn-update[data-key="${key}"]`);
+  if (editEl) editEl.style.display = "none";
+  if (displayEl) displayEl.style.display = "block";
+  if (btn) btn.style.display = "block";
+}
+
+async function _saveDebt(key) {
+  const input = document.getElementById(`input-${key}`);
+  const noteEl = document.getElementById(`note-${key}`);
+  if (!input) return;
+
+  const newBalance = parseFloat(input.value);
+  if (isNaN(newBalance) || newBalance < 0) {
+    showToast("⚠️ Ingresa un monto válido");
+    return;
+  }
+
+  const notes = noteEl?.value || "";
+  const oldBalance = CONFIG.debts[key].balance;
+
+  // Actualizar en memoria
+  CONFIG.debts[key].balance = newBalance;
+
+  // Actualizar display inmediatamente
+  const displayEl = document.getElementById(`balance-display-${key}`);
+  if (displayEl) displayEl.textContent = fmt(newBalance);
+
+  // Cerrar form
+  _closeEdit(key);
+
+  // Guardar en Sheets
+  showToast("⏳ Guardando...");
+  const res = await SHEETS.updateDebt(key, newBalance, notes);
+  await SHEETS.saveSnapshot({
+    date: new Date().toISOString().split('T')[0],
+    banorte: CONFIG.debts.banorte.balance,
+    banamexNomina: CONFIG.debts.banamexNomina.balance,
+    banamexTDC: CONFIG.debts.banamexTDC.balance,
+    nu: CONFIG.debts.nu.balance,
+    totalDebt: CALC.totalDebt(),
+    notes: `${key}: ${oldBalance} → ${newBalance}. ${notes}`
+  });
+
+  // Re-render contadores
+  renderCounters();
+  renderDebtCards();
+
+  const msg = res.success
+    ? `✅ ${CONFIG.debts[key].label} actualizado`
+    : "⚠️ Guardado localmente (sin conexión a Sheets)";
+  showToast(msg);
+
+  // Actualizar timestamp
+  set("last-updated", new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }));
 }
 
 // ── HELPERS ───────────────────────────────────────────────
