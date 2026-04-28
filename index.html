@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Dashboard de liquidación de deuda — Octavio Jimenez 2026">
   <title>Debt Dashboard · OSJS 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,31 +13,31 @@
 
 <div class="app-shell">
 
-  <!-- ── HEADER ─────────────────────────────────────────── -->
+  <!-- HEADER -->
   <header class="app-header">
     <div>
       <h1>📊 Debt Dashboard</h1>
       <div class="app-header__meta">Octavio Jimenez · Meta: 1-Oct-2026 · Actualizado <span id="last-updated">—</span></div>
     </div>
     <div class="app-header__actions">
-      <button class="btn btn--ghost" id="btn-sync">↑ Sincronizar</button>
+      <button class="btn btn--ghost" id="btn-sync">↑ Sync</button>
       <button class="btn btn--danger" id="btn-revert">↩ Revertir</button>
     </div>
   </header>
 
-  <!-- ── COUNTERS ───────────────────────────────────────── -->
+  <!-- COUNTERS -->
   <section class="section">
     <div class="counter-grid">
       <div class="counter-card counter-card--red">
         <div class="counter-card__label">Deuda total</div>
-        <div class="counter-card__value text-red" id="total-debt">—</div>
-        <div class="progress-bar"><div class="progress-bar__fill" id="debt-progress-fill" style="width:0%"></div></div>
-        <div class="progress-label" id="debt-progress-pct">—</div>
+        <div class="counter-card__value text-red" id="total-debt">$0</div>
+        <div class="progress-bar"><div class="progress-bar__fill" id="debt-progress-fill"></div></div>
+        <div class="progress-label" id="debt-progress-pct">0% liquidado</div>
       </div>
       <div class="counter-card counter-card--purple">
         <div class="counter-card__label">Días al 1-Oct</div>
         <div class="counter-card__value text-purple" id="days-to-target">—</div>
-        <div class="counter-card__sub">Días al pivote: <span id="days-to-pivote">—</span></div>
+        <div class="counter-card__sub">Días al pivote: <strong id="days-to-pivote">—</strong></div>
       </div>
       <div class="counter-card counter-card--green">
         <div class="counter-card__label">Excedente / mes</div>
@@ -47,8 +46,8 @@
       </div>
       <div class="counter-card counter-card--blue">
         <div class="counter-card__label">Score Buró</div>
-        <div class="counter-card__value text-blue" id="buro-score">—</div>
-        <div class="counter-card__sub">Puntualidad 100% · Jun est. ~725</div>
+        <div class="counter-card__value text-blue" id="buro-score">685</div>
+        <div class="counter-card__sub">100% puntualidad · Jun ~725</div>
       </div>
       <div class="counter-card counter-card--yellow">
         <div class="counter-card__label">Infonavit</div>
@@ -58,71 +57,57 @@
     </div>
   </section>
 
-  <!-- ── DEUDAS ─────────────────────────────────────────── -->
+  <!-- DEUDAS -->
   <section class="section">
     <h2>Saldos por tarjeta / crédito</h2>
     <div id="debt-cards"></div>
   </section>
 
-  <!-- ── ESCENARIOS OPCIONALES ──────────────────────────── -->
+  <!-- ESCENARIOS -->
   <section class="section">
     <h2>Escenarios opcionales</h2>
-
     <div class="scenario-note" style="margin-bottom:.75rem;">
       <div class="scenario-note__header">
         <span>💜 Apoyo pareja $200k</span>
-        <label class="toggle-wrap">
-          Activar
-          <label class="toggle">
-            <input type="checkbox" id="toggle-partner">
-            <span class="toggle__slider"></span>
-          </label>
+        <label class="toggle-wrap">Activar
+          <label class="toggle"><input type="checkbox" id="toggle-partner"><span class="toggle__slider"></span></label>
         </label>
       </div>
-      <div id="partner-scenario" style="display:none;">
-        $100k el 31-May + $100k el 30-Jun → Banorte en $0 el 30-Jun antes de revisiones de buró.<br>
-        Ahorro intereses: ~$3,775 MXN · Trade-off: deuda Oct +$44k · Pago de regreso: $66,667/mes Jul-Sep.<br>
-        <strong>Alternativa más eficiente:</strong> Co-firma de hipoteca — misma ventaja, sin deuda entre ustedes.
+      <div id="partner-scenario" style="display:none;margin-top:.5rem;font-size:0.7rem;line-height:1.7;">
+        $100k el 31-May + $100k el 30-Jun → Banorte en $0 el 30-Jun.<br>
+        Ahorro intereses: ~$3,775 · Pago de regreso: $66,667/mes Jul-Sep.<br>
+        <strong>Alternativa:</strong> Co-firma hipoteca — misma ventaja, sin deuda entre ustedes.
       </div>
     </div>
-
     <div class="scenario-note">
       <div class="scenario-note__header">
         <span>🏠 Airbnb Mundial Jun-Jul</span>
-        <label class="toggle-wrap">
-          Activar
-          <label class="toggle">
-            <input type="checkbox" id="toggle-airbnb">
-            <span class="toggle__slider"></span>
-          </label>
+        <label class="toggle-wrap">Activar
+          <label class="toggle"><input type="checkbox" id="toggle-airbnb"><span class="toggle__slider"></span></label>
         </label>
       </div>
-      <div id="airbnb-scenario" style="display:none;">
-        ~20 noches en Jun-Jul · Estimado neto: ~$30,000 MXN.<br>
-        Llegaría justo antes del pivote del 30-Jun — reduce Banamex Nómina antes de redisponer.<br>
-        Decisión pendiente con pareja.
+      <div id="airbnb-scenario" style="display:none;margin-top:.5rem;font-size:0.7rem;line-height:1.7;">
+        ~20 noches Jun-Jul · Estimado neto: ~$30,000 MXN.<br>
+        Reduce Banamex antes del pivote. Decisión pendiente con pareja.
       </div>
     </div>
   </section>
 
-  <!-- ── PLAN MENSUAL ───────────────────────────────────── -->
+  <!-- PLAN MENSUAL -->
   <section class="section">
     <h2>Plan mensual — Abr → Oct 2026</h2>
     <div id="monthly-plan"></div>
   </section>
 
-  <!-- ── SUSCRIPCIONES ──────────────────────────────────── -->
+  <!-- SUSCRIPCIONES -->
   <section class="section">
     <h2>Suscripciones mensuales</h2>
     <div class="card">
       <table class="subs-table">
         <thead>
           <tr>
-            <th>Servicio</th>
-            <th class="text-right">Abr</th>
-            <th class="text-right">May+</th>
-            <th class="text-right">Ago+</th>
-            <th>Nota</th>
+            <th>Servicio</th><th class="text-right">Abr</th>
+            <th class="text-right">May+</th><th class="text-right">Ago+</th><th>Nota</th>
           </tr>
         </thead>
         <tbody id="subs-tbody"></tbody>
@@ -131,80 +116,70 @@
     </div>
   </section>
 
-  <!-- ── MES PERFECTO ───────────────────────────────────── -->
+  <!-- MES PERFECTO -->
   <section class="section">
     <h2>El mes perfecto — Presupuesto objetivo (May+)</h2>
     <div class="card">
       <div class="perfect-month">
         <div class="pm-col">
-          <div class="pm-col__title text-green">Entradas</div>
+          <div class="pm-col__title text-green">↑ Entradas</div>
           <div class="pm-row"><span>Nómina neta</span><span class="text-green">$83,096</span></div>
           <div class="pm-row"><span>Vales despensa</span><span class="text-green">+$3,292</span></div>
-          <div class="pm-row"><span>Offcycle 2.5% (Jun+)</span><span class="text-green">✅ incluido</span></div>
-          <div class="pm-row" style="font-weight:700;">
-            <span>Total entradas</span>
-            <span class="text-green" id="perfect-total-income">—</span>
+          <div class="pm-row"><span>Offcycle 2.5% (Jun+)</span><span class="text-green">incluido</span></div>
+          <div class="pm-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
+            <span>Total</span><span class="text-green" id="perfect-total-income">$86,388</span>
           </div>
         </div>
         <div class="pm-col">
-          <div class="pm-col__title text-red">Salidas fijas</div>
+          <div class="pm-col__title text-red">↓ Salidas</div>
           <div class="pm-row"><span>Renta + servicios</span><span class="text-red">-$17,250</span></div>
           <div class="pm-row"><span>AT&T personal</span><span class="text-red">-$532</span></div>
           <div class="pm-row"><span>Subs trabajo/Smability</span><span class="text-blue">-$1,951</span></div>
           <div class="pm-row"><span>Apple + Google One</span><span class="text-yellow">-$613</span></div>
           <div class="pm-row"><span>Amazon (hasta Jul)</span><span class="text-yellow">-$75</span></div>
-          <div class="pm-row"><span>Banamex Nómina cuota</span><span class="text-yellow">-$4,092</span></div>
+          <div class="pm-row"><span>Banamex cuota</span><span class="text-yellow">-$4,092</span></div>
           <div class="pm-row"><span>Banorte mínimo</span><span class="text-yellow">-$13,544</span></div>
-          <div class="pm-col__title text-yellow" style="margin-top:.625rem;">Salidas variables</div>
-          <div class="pm-row"><span>Restaurantes / salidas</span><span class="text-yellow">-$5,000</span></div>
-          <div class="pm-row"><span>Traslados / Uber</span><span class="text-yellow">-$1,500</span></div>
+          <div class="pm-row"><span>Restaurantes</span><span class="text-yellow">-$5,000</span></div>
+          <div class="pm-row"><span>Traslados</span><span class="text-yellow">-$1,500</span></div>
           <div class="pm-row"><span>Despensa / súper</span><span class="text-yellow">-$3,000</span></div>
-          <div class="pm-row" style="font-style:italic;"><span>Nu — float corriente</span><span class="text-muted">flujo</span></div>
-          <div class="pm-row" style="font-weight:700;">
-            <span>Total salidas</span>
-            <span class="text-red" id="perfect-total-expenses">—</span>
+          <div class="pm-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
+            <span>Total</span><span class="text-red" id="perfect-total-expenses">-$47,557</span>
           </div>
         </div>
       </div>
       <div class="pm-surplus">
         <span>💜 Excedente para deuda</span>
-        <span class="text-purple" id="perfect-surplus">—</span>
+        <span class="text-purple" id="perfect-surplus">$40,768</span>
       </div>
-      <div style="margin-top:.75rem;font-size:0.68rem;color:var(--text-muted);">
-        Semana tipo: $1,625 máx (restaurantes $1,250 + traslados $375) · Si día 15 Nu > $3,500 → frenar esa semana
-      </div>
+      <div class="pm-note">$1,625/sem máx · Si Nu &gt; $3,500 el día 15 → frenar gastos esa semana</div>
     </div>
   </section>
 
-  <!-- ── TIMELINE HIPOTECA ──────────────────────────────── -->
+  <!-- TIMELINE -->
   <section class="section">
-    <h2>Timeline hipoteca — Banamex $1.7M + Infonavit $1M</h2>
+    <h2>Timeline hipoteca · Banamex $1.7M + Infonavit $1M</h2>
     <div class="card">
       <div class="timeline" id="timeline"></div>
-      <div style="margin-top:1rem;font-size:0.7rem;color:var(--text-muted);line-height:1.6;">
-        Score actual: <strong class="text-blue">685</strong> · 
-        Estimado Jun: <strong class="text-green">~725</strong> · 
-        Estimado Ago: <strong class="text-green">~745</strong><br>
-        Cuota total hipoteca: <strong>~$25,000/mes</strong> · 
-        Ratio deuda/ingreso con hipoteca: <strong>~29%</strong> · 
-        Preaprobado: <strong class="text-green">✅</strong>
+      <div class="pm-note" style="margin-top:1rem;">
+        Score: <strong class="text-blue">685</strong> · Jun: <strong class="text-green">~725</strong> · Ago: <strong class="text-green">~745</strong> ·
+        Cuota: <strong>~$25,000/mes</strong> · Ratio: <strong>~29%</strong> · Preaprobado: <strong class="text-green">✅</strong>
       </div>
     </div>
   </section>
 
-  <!-- ── HISTORIAL ──────────────────────────────────────── -->
+  <!-- HISTORIAL -->
   <section class="section">
     <h2>Historial de cambios</h2>
-    <div class="card">
-      <div id="history-log"></div>
-    </div>
+    <div class="card"><div id="history-log"><div class="text-muted">Cargando...</div></div></div>
   </section>
 
-</div><!-- /app-shell -->
+</div>
 
-<!-- ── TOAST ──────────────────────────────────────────────── -->
 <div id="toast"></div>
 
-<script type="module" src="js/app.js"></script>
+<!-- Sin type=module para mayor compatibilidad — usamos IIFE en app.js -->
+<script src="js/config.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
