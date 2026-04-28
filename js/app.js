@@ -203,41 +203,36 @@ function updateTimestamp() {
 
 // ── COUNTERS ──────────────────────────────────────────────
 function renderCounters() {
-  var total   = CALC.totalDebt();
-  var surplus = CALC.surplusForMonth();
-  var pct     = CALC.pctPaid();
+  var total        = CALC.totalDebt();
+  var surplusDebt  = CALC.surplusForDebt();
+  var pct          = CALC.pctPaid();
 
-  // Deuda total — editable
-  renderEditableCounter("total-debt", fmt(total), "Deuda total", function(newVal) {
-    // Distribuir la diferencia proporcionalmente
-    var diff   = newVal - total;
-    var keys   = ["banorte","banamexNomina"];
-    var bTotal = keys.reduce(function(s,k){ return s + CONFIG.debts[k].balance; }, 0);
-    keys.forEach(function(k) {
-      var share = bTotal > 0 ? CONFIG.debts[k].balance / bTotal : 0.5;
-      CONFIG.debts[k].balance = Math.max(0, Math.round(CONFIG.debts[k].balance + diff * share));
+  renderEditableCounter("total-debt", fmt(total), function(newVal) {
+    var diff  = newVal - total;
+    var keys  = ["banorte","banamexNomina"];
+    var bTotal= keys.reduce(function(s,k){ return s+CONFIG.debts[k].balance; },0);
+    keys.forEach(function(k){
+      var share = bTotal>0 ? CONFIG.debts[k].balance/bTotal : 0.5;
+      CONFIG.debts[k].balance = Math.max(0, Math.round(CONFIG.debts[k].balance + diff*share));
     });
-    persistAndRender("Ajuste manual deuda total: " + fmt(newVal));
+    persistAndRender("Ajuste manual deuda total: "+fmt(newVal));
   });
 
-  // Score buró — editable
-  renderEditableCounter("buro-score", CONFIG.buro.score, "Score Buró", function(newVal) {
+  renderEditableCounter("buro-score", CONFIG.buro.score, function(newVal) {
     CONFIG.buro.score = newVal;
-    persistAndRender("Score buró actualizado: " + newVal);
+    persistAndRender("Score buró actualizado: "+newVal);
   });
 
-  set("days-to-target",  CALC.daysTo(CONFIG.targetDate));
-  set("days-to-pivote",  CALC.daysTo(CONFIG.pivoteDate));
-  set("monthly-surplus", fmt(surplus));
+  set("days-to-target",   CALC.daysTo(CONFIG.targetDate));
+  set("days-to-pivote",   CALC.daysTo(CONFIG.pivoteDate));
+  set("monthly-surplus",  fmt(surplusDebt));
   set("ei-total-counter", fmt(EI.totalPending()));
-  set("debt-progress-pct", pct + "% liquidado");
-  setStyle("debt-progress-fill","width", pct + "%");
-
-  // Alertas de vencimiento
+  set("debt-progress-pct",pct+"% liquidado");
+  setStyle("debt-progress-fill","width",pct+"%");
   checkDueDates();
 }
 
-function renderEditableCounter(id, displayVal, label, onSave) {
+function renderEditableCounter(id, displayVal, onSave) {
   var el = document.getElementById(id);
   if (!el) return;
   el.textContent = displayVal;
@@ -328,23 +323,43 @@ function renderDebtCards() {
 
 // ── BUDGET SECTION ────────────────────────────────────────
 function renderBudget() {
-  renderBudgetTable("fixed-expenses-body",   CONFIG.fixedExpenses,    saveBudgetFixed);
-  renderBudgetTable("variable-expenses-body",CONFIG.variableExpenses, saveBudgetVariable);
+  var ym       = currentYM();
+  var income   = CALC.monthlyIncome(ym);
+  var fixed    = CALC.totalFixed();
+  var variable = CALC.totalVariable();
+  var mins     = CALC.totalMinPayments();
+  var surplus  = CALC.surplusForDebt(ym);
+
+  // Render cada tabla editable
   renderBudgetTable("income-body", [
-    {id:"nomina",    label:"Nómina neta mensual",   amount:CONFIG.income.nomina},
-    {id:"vales",     label:"Vales de despensa",      amount:CONFIG.income.vales},
+    { id:"nomina", label:"Nómina neta mensual", amount: ym >= "2026-06" ? CONFIG.income.nomina : CONFIG.income.nominaPreOffcycle },
+    { id:"vales",  label:"Vales de despensa",   amount: CONFIG.income.vales  },
+    { id:"otros",  label:"Otros ingresos",      amount: CONFIG.income.otros || 0 },
   ], saveBudgetIncome);
 
-  // Totales
-  var totalFixed    = CALC.totalFixed();
-  var totalVariable = CALC.totalVariable();
-  var totalIncome   = CALC.monthlyIncome();
-  var totalMins     = CALC.totalMinPayments();
-  var surplus       = CALC.surplusForMonth();
+  renderBudgetTable("fixed-expenses-body",    CONFIG.fixedExpenses,    saveBudgetFixed);
+  renderBudgetTable("variable-expenses-body", CONFIG.variableExpenses, saveBudgetVariable);
 
-  set("budget-total-fixed",    fmt(totalFixed));
-  set("budget-total-variable", fmt(totalVariable));
-  set("budget-total-income",   fmt(totalIncome));
+  // Mínimos de deuda — readonly, se leen de CONFIG.debts
+  var minsBody = document.getElementById("mins-body");
+  if (minsBody) {
+    minsBody.innerHTML = Object.entries(CONFIG.debts)
+      .filter(function(e){ return e[1].minPayment > 0; })
+      .map(function(e){
+        var key=e[0], d=e[1];
+        return '<tr>' +
+          '<td>'+d.label+' (mín)</td>' +
+          '<td class="text-right text-yellow">'+fmt(d.minPayment)+'</td>' +
+          '<td></td>' +
+        '</tr>';
+      }).join("");
+  }
+
+  // Totales y excedente
+  set("budget-total-income",   fmt(income));
+  set("budget-total-fixed",    fmt(fixed));
+  set("budget-total-variable", fmt(variable));
+  set("budget-total-mins",     fmt(mins));
   set("budget-surplus",        fmt(surplus));
   set("monthly-surplus",       fmt(surplus));
 }
@@ -394,8 +409,9 @@ async function saveBudgetVariable(items) {
 
 async function saveBudgetIncome(items) {
   items.forEach(function(i){
-    if (i.id === "nomina") CONFIG.income.nomina = i.amount;
-    if (i.id === "vales")  CONFIG.income.vales  = i.amount;
+    if (i.id==="nomina") CONFIG.income.nomina = i.amount;
+    if (i.id==="vales")  CONFIG.income.vales  = i.amount;
+    if (i.id==="otros")  CONFIG.income.otros  = i.amount;
   });
   await SHEETS.saveConfig("income", JSON.stringify(CONFIG.income), "Ingresos actualizados");
   await saveAll("Ingresos actualizados");
