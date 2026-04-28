@@ -10,18 +10,25 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-
 <div class="app-shell">
 
   <!-- HEADER -->
   <header class="app-header">
     <div>
       <h1>📊 Debt Dashboard</h1>
-      <div class="app-header__meta">Octavio Jimenez · Meta: 1-Oct-2026 · Actualizado <span id="last-updated">—</span></div>
+      <div class="app-header__meta">
+        Octavio Jimenez · Meta: 1-Oct-2026 ·
+        Actualizado <span id="last-updated">—</span>
+      </div>
+      <div class="app-header__conn">
+        <span class="conn-dot" id="conn-dot"></span>
+        <span id="conn-label" style="font-size:.65rem;color:var(--text-muted);">Conectando...</span>
+      </div>
     </div>
     <div class="app-header__actions">
-      <button class="btn btn--ghost" id="btn-sync">↑ Sync</button>
-      <button class="btn btn--danger" id="btn-revert">↩ Revertir</button>
+      <span class="save-status" id="save-status"></span>
+      <button class="btn btn--primary" id="btn-save-all">💾 Guardar</button>
+      <button class="btn btn--danger"  id="btn-revert">↩ Revertir</button>
     </div>
   </header>
 
@@ -29,10 +36,10 @@
   <section class="section">
     <div class="counter-grid">
       <div class="counter-card counter-card--red">
-        <div class="counter-card__label">Deuda total</div>
-        <div class="counter-card__value text-red" id="total-debt">$0</div>
+        <div class="counter-card__label">Deuda total <span class="editable-hint">clic para editar</span></div>
+        <div class="counter-card__value text-red" id="total-debt">—</div>
         <div class="progress-bar"><div class="progress-bar__fill" id="debt-progress-fill"></div></div>
-        <div class="progress-label" id="debt-progress-pct">0% liquidado</div>
+        <div class="progress-label" id="debt-progress-pct">0%</div>
       </div>
       <div class="counter-card counter-card--purple">
         <div class="counter-card__label">Días al 1-Oct</div>
@@ -42,16 +49,16 @@
       <div class="counter-card counter-card--green">
         <div class="counter-card__label">Excedente / mes</div>
         <div class="counter-card__value text-green" id="monthly-surplus">—</div>
-        <div class="counter-card__sub">Para deuda (May+)</div>
+        <div class="counter-card__sub">Ingresos − gastos − mínimos</div>
       </div>
       <div class="counter-card counter-card--blue">
-        <div class="counter-card__label">Score Buró</div>
-        <div class="counter-card__value text-blue" id="buro-score">685</div>
+        <div class="counter-card__label">Score Buró <span class="editable-hint">clic para editar</span></div>
+        <div class="counter-card__value text-blue" id="buro-score">—</div>
         <div class="counter-card__sub">100% puntualidad · Jun ~725</div>
       </div>
       <div class="counter-card counter-card--yellow">
         <div class="counter-card__label">Ingresos potenciales</div>
-        <div class="counter-card__value text-yellow" id="infonavit-balance">—</div>
+        <div class="counter-card__value text-yellow" id="ei-total-counter">—</div>
         <div class="counter-card__sub">Total pendiente por recibir</div>
       </div>
     </div>
@@ -66,8 +73,73 @@
   <!-- OTROS INGRESOS -->
   <section class="section">
     <h2>Otros ingresos potenciales</h2>
-    <div class="card" id="ei-container">
-      <div class="text-muted">Cargando...</div>
+    <div class="card" id="ei-container"><div class="text-muted">Cargando...</div></div>
+  </section>
+
+  <!-- PRESUPUESTO -->
+  <section class="section">
+    <h2>Presupuesto base mensual</h2>
+    <div class="card">
+      <div class="budget-grid">
+
+        <!-- Ingresos -->
+        <div class="budget-col">
+          <div class="budget-col__title text-green">↑ Ingresos fijos</div>
+          <table class="budget-table">
+            <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
+            <tbody id="income-body"></tbody>
+          </table>
+        </div>
+
+        <!-- Gastos fijos -->
+        <div class="budget-col">
+          <div class="budget-col__title text-red">↓ Gastos fijos</div>
+          <table class="budget-table">
+            <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
+            <tbody id="fixed-expenses-body"></tbody>
+          </table>
+        </div>
+
+        <!-- Gastos variables -->
+        <div class="budget-col">
+          <div class="budget-col__title text-yellow">↓ Gastos variables</div>
+          <table class="budget-table">
+            <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
+            <tbody id="variable-expenses-body"></tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- Resumen presupuesto -->
+      <div class="budget-summary">
+        <div class="budget-summary__row">
+          <span>Total ingresos</span><span class="text-green" id="budget-total-income">—</span>
+        </div>
+        <div class="budget-summary__row">
+          <span>Total gastos fijos</span><span class="text-red" id="budget-total-fixed">—</span>
+        </div>
+        <div class="budget-summary__row">
+          <span>Total gastos variables</span><span class="text-yellow" id="budget-total-variable">—</span>
+        </div>
+        <div class="budget-summary__row budget-summary__row--total">
+          <span>💜 Excedente para deuda</span><span class="text-purple" id="budget-surplus">—</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUSCRIPCIONES -->
+  <section class="section">
+    <h2>Suscripciones mensuales</h2>
+    <div class="card">
+      <table class="subs-table">
+        <thead>
+          <tr><th>Servicio</th><th class="text-right">Inicio</th><th class="text-right">Actual</th><th>Nota</th><th></th></tr>
+        </thead>
+        <tbody id="subs-tbody"></tbody>
+        <tfoot><tr id="subs-tfoot"></tr></tfoot>
+      </table>
     </div>
   </section>
 
@@ -77,70 +149,16 @@
     <div id="monthly-plan"></div>
   </section>
 
-  <!-- SUSCRIPCIONES -->
-  <section class="section">
-    <h2>Suscripciones mensuales</h2>
-    <div class="card">
-      <table class="subs-table">
-        <thead>
-          <tr>
-            <th>Servicio</th><th class="text-right">Abr</th>
-            <th class="text-right">May+</th><th class="text-right">Ago+</th><th>Nota</th>
-          </tr>
-        </thead>
-        <tbody id="subs-tbody"></tbody>
-        <tfoot><tr id="subs-tfoot"></tr></tfoot>
-      </table>
-    </div>
-  </section>
-
-  <!-- MES PERFECTO -->
-  <section class="section">
-    <h2>El mes perfecto — Presupuesto objetivo (May+)</h2>
-    <div class="card">
-      <div class="perfect-month">
-        <div class="pm-col">
-          <div class="pm-col__title text-green">↑ Entradas</div>
-          <div class="pm-row"><span>Nómina neta</span><span class="text-green">$83,096</span></div>
-          <div class="pm-row"><span>Vales despensa</span><span class="text-green">+$3,292</span></div>
-          <div class="pm-row"><span>Offcycle 2.5% (Jun+)</span><span class="text-green">incluido</span></div>
-          <div class="pm-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
-            <span>Total</span><span class="text-green" id="perfect-total-income">$86,388</span>
-          </div>
-        </div>
-        <div class="pm-col">
-          <div class="pm-col__title text-red">↓ Salidas</div>
-          <div class="pm-row"><span>Renta + servicios</span><span class="text-red">-$17,250</span></div>
-          <div class="pm-row"><span>AT&T personal</span><span class="text-red">-$532</span></div>
-          <div class="pm-row"><span>Subs trabajo/Smability</span><span class="text-blue">-$1,951</span></div>
-          <div class="pm-row"><span>Apple + Google One</span><span class="text-yellow">-$613</span></div>
-          <div class="pm-row"><span>Amazon (hasta Jul)</span><span class="text-yellow">-$75</span></div>
-          <div class="pm-row"><span>Banamex cuota</span><span class="text-yellow">-$4,092</span></div>
-          <div class="pm-row"><span>Banorte mínimo</span><span class="text-yellow">-$13,544</span></div>
-          <div class="pm-row"><span>Restaurantes</span><span class="text-yellow">-$5,000</span></div>
-          <div class="pm-row"><span>Traslados</span><span class="text-yellow">-$1,500</span></div>
-          <div class="pm-row"><span>Despensa / súper</span><span class="text-yellow">-$3,000</span></div>
-          <div class="pm-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
-            <span>Total</span><span class="text-red" id="perfect-total-expenses">-$47,557</span>
-          </div>
-        </div>
-      </div>
-      <div class="pm-surplus">
-        <span>💜 Excedente para deuda</span>
-        <span class="text-purple" id="perfect-surplus">$40,768</span>
-      </div>
-      <div class="pm-note">$1,625/sem máx · Si Nu &gt; $3,500 el día 15 → frenar gastos esa semana</div>
-    </div>
-  </section>
-
   <!-- TIMELINE -->
   <section class="section">
     <h2>Timeline hipoteca · Banamex $1.7M + Infonavit $1M</h2>
     <div class="card">
       <div class="timeline" id="timeline"></div>
       <div class="pm-note" style="margin-top:1rem;">
-        Score: <strong class="text-blue">685</strong> · Jun: <strong class="text-green">~725</strong> · Ago: <strong class="text-green">~745</strong> ·
-        Cuota: <strong>~$25,000/mes</strong> · Ratio: <strong>~29%</strong> · Preaprobado: <strong class="text-green">✅</strong>
+        Score: <strong class="text-blue" id="buro-score-note">685</strong> ·
+        Jun: <strong class="text-green">~725</strong> ·
+        Ago: <strong class="text-green">~745</strong> ·
+        Cuota: <strong>~$25,000/mes</strong> · Preaprobado: <strong class="text-green">✅</strong>
       </div>
     </div>
   </section>
@@ -152,10 +170,7 @@
   </section>
 
 </div>
-
 <div id="toast"></div>
-
-<!-- Sin type=module para mayor compatibilidad — usamos IIFE en app.js -->
 <script src="js/config.js"></script>
 <script src="js/sheets.js"></script>
 <script src="js/app.js"></script>
