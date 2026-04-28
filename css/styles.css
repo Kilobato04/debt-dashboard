@@ -243,6 +243,60 @@ h2  { font-size:0.65rem; text-transform:uppercase; letter-spacing:.07em; color:v
 .btn--ghost  { background:transparent; border:1px solid var(--border); color:var(--text-sub); }
 .btn--danger { background:var(--red-bg); border:1px solid var(--red-b); color:var(--red); }
 
+/* ── EXTRAORDINARY INCOME ── */
+.ei-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:.875rem; flex-wrap:wrap; gap:.5rem;
+}
+.ei-total { display:flex; flex-direction:column; gap:.15rem; }
+
+.ei-form { margin-bottom:.875rem; }
+.ei-form__grid {
+  display:grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+  gap:.4rem; margin-bottom:.4rem;
+}
+@media(max-width:700px){ .ei-form__grid { grid-template-columns:1fr 1fr; } }
+
+.ei-notes { grid-column: 1 / -1; }
+
+.ei-form__actions { display:flex; gap:.35rem; }
+
+.ei-list { display:flex; flex-direction:column; gap:.4rem; }
+
+.ei-row {
+  border:1px solid var(--border); border-radius:var(--r);
+  padding:.625rem .75rem; background:var(--surface2);
+  border-left:3px solid var(--border);
+}
+.ei-row--green  { border-left-color:var(--green-b); }
+.ei-row--yellow { border-left-color:var(--yellow-b); }
+.ei-row--red    { border-left-color:var(--red-b); }
+.ei-row--done   { opacity:.55; }
+
+.ei-row__view {
+  display:flex; justify-content:space-between;
+  align-items:flex-start; gap:.75rem; flex-wrap:wrap;
+}
+.ei-row__left  { display:flex; flex-direction:column; gap:.3rem; }
+.ei-row__right { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+
+.ei-row__desc   { font-size:.75rem; font-weight:600; color:var(--text); }
+.ei-row__note   { font-size:.65rem; color:var(--text-muted); }
+.ei-row__amount { font-size:.85rem; font-weight:700; }
+.ei-row__date   { font-size:.65rem; }
+.ei-row__status { font-size:.65rem; color:var(--text-sub); }
+
+.ei-row__edit { margin-top:.5rem; }
+
+.ei-btn-edit, .ei-btn-delete {
+  background:transparent; border:none; cursor:pointer;
+  font-size:.75rem; padding:.2rem .35rem; border-radius:4px;
+  color:var(--text-muted); transition:color .15s;
+}
+.ei-btn-edit:hover   { color:var(--purple); }
+.ei-btn-delete:hover { color:var(--red); }
+
 /* ── TOAST ── */
 #toast {
   position:fixed; bottom:1.5rem; left:50%;
