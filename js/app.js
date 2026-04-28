@@ -112,7 +112,7 @@ function renderCounters() {
   set("days-to-pivote", CALC.daysTo(CONFIG.pivoteDate));
   set("monthly-surplus", fmt(CALC.surplusForDebt("2026-06")));
   set("buro-score", CONFIG.buro.currentScore);
-  set("infonavit-balance", fmt(CONFIG.infonavit.currentBalance));
+  set("infonavit-balance", fmt(EI.totalPending()));
   set("debt-progress-pct", pct + "% liquidado");
   setStyle("debt-progress-fill", "width", pct + "%");
 }
