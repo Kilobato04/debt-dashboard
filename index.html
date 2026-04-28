@@ -93,7 +93,7 @@
 
         <!-- Gastos fijos -->
         <div class="budget-col">
-          <div class="budget-col__title text-red">↓ Gastos fijos</div>
+          <div class="budget-col__title text-red">↓ Gastos fijos de vida</div>
           <table class="budget-table">
             <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
             <tbody id="fixed-expenses-body"></tbody>
@@ -111,19 +111,34 @@
 
       </div>
 
+      <!-- Mínimos de deuda — readonly, desde tarjetas -->
+      <div class="budget-mins">
+        <div class="budget-mins__title text-red">↓ Pagos mínimos de deuda <span class="text-muted">(desde tarjetas — edita en saldos)</span></div>
+        <table class="budget-table">
+          <tbody id="mins-body"></tbody>
+        </table>
+      </div>
+
       <!-- Resumen presupuesto -->
       <div class="budget-summary">
         <div class="budget-summary__row">
           <span>Total ingresos</span><span class="text-green" id="budget-total-income">—</span>
         </div>
         <div class="budget-summary__row">
-          <span>Total gastos fijos</span><span class="text-red" id="budget-total-fixed">—</span>
+          <span>Total gastos fijos de vida</span><span class="text-red" id="budget-total-fixed">—</span>
         </div>
         <div class="budget-summary__row">
           <span>Total gastos variables</span><span class="text-yellow" id="budget-total-variable">—</span>
         </div>
+        <div class="budget-summary__row">
+          <span>Total mínimos de deuda</span><span class="text-red" id="budget-total-mins">—</span>
+        </div>
         <div class="budget-summary__row budget-summary__row--total">
-          <span>💜 Excedente para deuda</span><span class="text-purple" id="budget-surplus">—</span>
+          <span>💜 Excedente para abonar extra a deuda</span>
+          <span class="text-purple" id="budget-surplus">—</span>
+        </div>
+        <div class="budget-summary__formula">
+          Ingresos − gastos de vida − mínimos de deuda = excedente para abono extra
         </div>
       </div>
     </div>
