@@ -118,6 +118,35 @@ h2{font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--te
 .budget-mins__title{font-size:.63rem;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:.4rem;}
 .budget-summary__formula{font-size:.62rem;color:var(--text-muted);margin-top:.4rem;font-style:italic;}
 
+/* BUDGET TOTALS ROW */
+.budget-totals-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.625rem;margin-bottom:1rem;}
+@media(max-width:600px){.budget-totals-row{grid-template-columns:repeat(2,1fr);}}
+.budget-total-chip{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:.75rem .875rem;}
+.budget-total-chip--green{border-left:3px solid var(--green-b);}
+.budget-total-chip--red{border-left:3px solid var(--red-b);}
+.budget-total-chip--yellow{border-left:3px solid var(--yellow-b);}
+.btc-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;}
+.btc-value{font-size:.95rem;font-weight:700;}
+
+.budget-detail{border-top:1px solid var(--border);padding-top:.875rem;margin-top:.25rem;}
+
+/* BUDGET BALANCE */
+.budget-balance{border-top:1px solid var(--border);padding-top:.875rem;margin-top:.875rem;}
+.budget-balance__title{font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-sub);margin-bottom:.625rem;font-weight:600;}
+.budget-balance__row{display:flex;justify-content:space-between;font-size:.75rem;padding:.3rem 0;border-bottom:1px solid var(--borderl);color:var(--text-sub);}
+.budget-balance__divider{height:1px;background:var(--border);margin:.5rem 0;}
+.budget-balance__result{display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.5rem .75rem;border-radius:var(--r);background:var(--purple-bg);border:1px solid var(--purple-b);}
+.budget-balance__formula{font-size:.62rem;color:var(--text-muted);margin-top:.4rem;font-style:italic;}
+
+.budget-mins{margin-top:.875rem;padding-top:.75rem;border-top:1px solid var(--border);}
+.budget-mins__title{font-size:.63rem;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:.4rem;}
+
+/* MONTH ROW TOTAL */
+.month-row--total{font-weight:600;border-top:1px solid var(--border);margin-top:.15rem;padding-top:.3rem !important;}
+
+/* MONTH GAP */
+.month-block__gap{margin-top:.5rem;padding:.5rem .75rem;background:var(--red-bg);border:1px solid var(--red-b);border-radius:var(--r);font-size:.72rem;color:var(--red);}
+
 /* SUBS TABLE */
 .subs-table{width:100%;border-collapse:collapse;font-size:.7rem;}
 .subs-table th{text-align:left;color:var(--text-sub);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:500;}
