@@ -80,67 +80,87 @@
   <section class="section">
     <h2>Presupuesto base mensual</h2>
     <div class="card">
-      <div class="budget-grid">
 
-        <!-- Ingresos -->
-        <div class="budget-col">
-          <div class="budget-col__title text-green">↑ Ingresos fijos</div>
-          <table class="budget-table">
-            <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
-            <tbody id="income-body"></tbody>
-          </table>
+      <!-- Fila de totales por categoría -->
+      <div class="budget-totals-row">
+        <div class="budget-total-chip budget-total-chip--green">
+          <div class="btc-label">↑ Ingresos fijos</div>
+          <div class="btc-value text-green" id="budget-total-income">—</div>
         </div>
-
-        <!-- Gastos fijos -->
-        <div class="budget-col">
-          <div class="budget-col__title text-red">↓ Gastos fijos de vida</div>
-          <table class="budget-table">
-            <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
-            <tbody id="fixed-expenses-body"></tbody>
-          </table>
+        <div class="budget-total-chip budget-total-chip--red">
+          <div class="btc-label">↓ Gastos fijos</div>
+          <div class="btc-value text-red" id="budget-total-fixed">—</div>
         </div>
-
-        <!-- Gastos variables -->
-        <div class="budget-col">
-          <div class="budget-col__title text-yellow">↓ Gastos variables</div>
-          <table class="budget-table">
-            <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
-            <tbody id="variable-expenses-body"></tbody>
-          </table>
+        <div class="budget-total-chip budget-total-chip--yellow">
+          <div class="btc-label">↓ Gastos variables</div>
+          <div class="btc-value text-yellow" id="budget-total-variable">—</div>
         </div>
-
+        <div class="budget-total-chip budget-total-chip--red">
+          <div class="btc-label">↓ Mínimos deuda</div>
+          <div class="btc-value text-red" id="budget-total-mins">—</div>
+        </div>
       </div>
 
-      <!-- Mínimos de deuda — readonly, desde tarjetas -->
-      <div class="budget-mins">
-        <div class="budget-mins__title text-red">↓ Pagos mínimos de deuda <span class="text-muted">(desde tarjetas — edita en saldos)</span></div>
-        <table class="budget-table">
-          <tbody id="mins-body"></tbody>
-        </table>
+      <!-- Detalle expandible -->
+      <div class="budget-detail">
+        <div class="budget-grid">
+          <div class="budget-col">
+            <div class="budget-col__title text-green">↑ Ingresos fijos</div>
+            <table class="budget-table">
+              <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
+              <tbody id="income-body"></tbody>
+            </table>
+          </div>
+          <div class="budget-col">
+            <div class="budget-col__title text-red">↓ Gastos fijos de vida</div>
+            <table class="budget-table">
+              <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
+              <tbody id="fixed-expenses-body"></tbody>
+            </table>
+          </div>
+          <div class="budget-col">
+            <div class="budget-col__title text-yellow">↓ Gastos variables</div>
+            <table class="budget-table">
+              <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
+              <tbody id="variable-expenses-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="budget-mins">
+          <div class="budget-mins__title text-red">↓ Pagos mínimos de deuda <span class="text-muted">(edita en tarjetas de saldo)</span></div>
+          <table class="budget-table"><tbody id="mins-body"></tbody></table>
+        </div>
       </div>
 
-      <!-- Resumen presupuesto -->
-      <div class="budget-summary">
-        <div class="budget-summary__row">
-          <span>Total ingresos</span><span class="text-green" id="budget-total-income">—</span>
+      <!-- Balance del mes -->
+      <div class="budget-balance">
+        <div class="budget-balance__title">Balance del mes</div>
+        <div class="budget-balance__row">
+          <span>Ingresos fijos</span>
+          <span class="text-green" id="bal-income">—</span>
         </div>
-        <div class="budget-summary__row">
-          <span>Total gastos fijos de vida</span><span class="text-red" id="budget-total-fixed">—</span>
+        <div class="budget-balance__row">
+          <span>− Gastos fijos de vida</span>
+          <span class="text-red" id="bal-fixed">—</span>
         </div>
-        <div class="budget-summary__row">
-          <span>Total gastos variables</span><span class="text-yellow" id="budget-total-variable">—</span>
+        <div class="budget-balance__row">
+          <span>− Gastos variables</span>
+          <span class="text-yellow" id="bal-variable">—</span>
         </div>
-        <div class="budget-summary__row">
-          <span>Total mínimos de deuda</span><span class="text-red" id="budget-total-mins">—</span>
+        <div class="budget-balance__row">
+          <span>− Mínimos de deuda</span>
+          <span class="text-red" id="bal-mins">—</span>
         </div>
-        <div class="budget-summary__row budget-summary__row--total">
-          <span>💜 Excedente para abonar extra a deuda</span>
-          <span class="text-purple" id="budget-surplus">—</span>
+        <div class="budget-balance__divider"></div>
+        <div class="budget-balance__result" id="bal-result-row">
+          <span>💜 Excedente para abono extra</span>
+          <span id="budget-surplus">—</span>
         </div>
-        <div class="budget-summary__formula">
-          Ingresos − gastos de vida − mínimos de deuda = excedente para abono extra
+        <div class="budget-balance__formula">
+          Ingresos − gastos de vida − mínimos de deuda = excedente para abono extra a capital
         </div>
       </div>
+
     </div>
   </section>
 
