@@ -328,40 +328,57 @@ function renderBudget() {
   var fixed    = CALC.totalFixed();
   var variable = CALC.totalVariable();
   var mins     = CALC.totalMinPayments();
-  var surplus  = CALC.surplusForDebt(ym);
+  var surplus  = income - fixed - variable - mins;
 
-  // Render cada tabla editable
+  // Render tablas editables
   renderBudgetTable("income-body", [
     { id:"nomina", label:"Nómina neta mensual", amount: ym >= "2026-06" ? CONFIG.income.nomina : CONFIG.income.nominaPreOffcycle },
-    { id:"vales",  label:"Vales de despensa",   amount: CONFIG.income.vales  },
+    { id:"vales",  label:"Vales de despensa",   amount: CONFIG.income.vales },
     { id:"otros",  label:"Otros ingresos",      amount: CONFIG.income.otros || 0 },
   ], saveBudgetIncome);
 
   renderBudgetTable("fixed-expenses-body",    CONFIG.fixedExpenses,    saveBudgetFixed);
   renderBudgetTable("variable-expenses-body", CONFIG.variableExpenses, saveBudgetVariable);
 
-  // Mínimos de deuda — readonly, se leen de CONFIG.debts
+  // Mínimos readonly desde CONFIG.debts
   var minsBody = document.getElementById("mins-body");
   if (minsBody) {
     minsBody.innerHTML = Object.entries(CONFIG.debts)
-      .filter(function(e){ return e[1].minPayment > 0; })
+      .filter(function(e){ return (e[1].minPayment||0) > 0; })
       .map(function(e){
-        var key=e[0], d=e[1];
-        return '<tr>' +
-          '<td>'+d.label+' (mín)</td>' +
-          '<td class="text-right text-yellow">'+fmt(d.minPayment)+'</td>' +
-          '<td></td>' +
-        '</tr>';
+        var d = e[1];
+        return '<tr><td>'+d.label+' (mín)</td>' +
+          '<td class="text-right text-yellow">'+fmt(d.minPayment)+'</td><td></td></tr>';
       }).join("");
   }
 
-  // Totales y excedente
+  // Chips de totales (fila superior)
   set("budget-total-income",   fmt(income));
   set("budget-total-fixed",    fmt(fixed));
   set("budget-total-variable", fmt(variable));
   set("budget-total-mins",     fmt(mins));
-  set("budget-surplus",        fmt(surplus));
-  set("monthly-surplus",       fmt(surplus));
+
+  // Balance del mes (sección inferior)
+  set("bal-income",   "+"+fmt(income));
+  set("bal-fixed",    "-"+fmt(fixed));
+  set("bal-variable", "-"+fmt(variable));
+  set("bal-mins",     "-"+fmt(mins));
+
+  var balResult = document.getElementById("budget-surplus");
+  var balRow    = document.getElementById("bal-result-row");
+  if (balResult) {
+    balResult.textContent = fmt(Math.abs(surplus));
+    balResult.className   = surplus >= 0 ? "text-purple" : "text-red";
+  }
+  if (balRow) {
+    var label = balRow.querySelector("span:first-child");
+    if (label) label.textContent = surplus >= 0
+      ? "💜 Excedente para abono extra"
+      : "🔴 Gap — necesitas "+fmt(Math.abs(surplus))+" adicionales";
+  }
+
+  // Sync con counter y plan mensual
+  set("monthly-surplus", fmt(surplus));
 }
 
 function renderBudgetTable(tbodyId, items, saveCallback) {
