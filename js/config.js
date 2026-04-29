@@ -99,6 +99,11 @@ var CONFIG = {
     punctuality: 100
   },
 
+  // ── PLAN ────────────────────────────────────────────────
+  // debtBaseline: deuda total al inicio del plan (para calcular % liquidado)
+  // No cambia; es el punto de partida histórico.
+  debtBaseline: 443499,
+
   // ── HIPOTECA (referencia) ────────────────────────────────
   mortgage: {
     banamex:   { amount: 1700000, rate: 10.25, years: 20, monthlyEst: 16500 },
@@ -159,9 +164,9 @@ var CALC = {
     return Math.max(0, Math.ceil((new Date(dateStr) - new Date()) / 86400000));
   },
 
-  // % liquidado desde baseline $443,499
+  // % liquidado desde baseline configurable
   pctPaid: function () {
-    var start   = 443499;
+    var start   = CONFIG.debtBaseline || 443499;
     var current = this.totalDebt();
     return Math.min(100, Math.max(0, Math.round(((start - current) / start) * 100)));
   }
