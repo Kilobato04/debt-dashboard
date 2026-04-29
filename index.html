@@ -1,213 +1,318 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Debt Dashboard · OSJS 2026</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Debt Tracker Pro · OSJS 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<div class="app-shell">
 
-  <!-- HEADER -->
-  <header class="app-header">
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- TAG TOP — connection dot -->
+<div class="tag-top">
+  <span id="conn-dot" class="conn-dot conn-dot--gray"></span>
+  <span id="conn-label">▸ DEBT TRACKER PRO · OSJS 2026</span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CALC SHELL
+══════════════════════════════════════════════════════════ -->
+<div class="calc">
+
+  <!-- ── BRAND ── -->
+  <div class="brand">
     <div>
-      <h1>📊 Debt Dashboard</h1>
-      <div class="app-header__meta">
-        Octavio Jimenez · Meta: 1-Oct-2026 ·
-        Actualizado <span id="last-updated">—</span>
+      <div class="brand-l">Debt Tracker Pro</div>
+      <div class="brand-m">OSJS · 2026 EDITION</div>
+    </div>
+    <div class="brand-dot"></div>
+  </div>
+
+  <!-- ── SCREEN LCD (siempre visible) ── -->
+  <div class="screen">
+    <div class="scr-top">
+      <div class="scr-mode" id="scr-mode-lbl">SALDOS</div>
+      <div class="scr-date" id="scr-date">—</div>
+    </div>
+
+    <div class="scr-big">
+      <div class="scr-big__lbl">DEUDA TOTAL</div>
+      <div class="scr-big__val" id="total-debt">—</div>
+    </div>
+
+    <div class="scr-rows">
+      <div class="scr-r">
+        <span class="scr-r__lbl">BANORTE</span>
+        <span class="scr-r__val scr-r__val--alert" id="scr-banorte">—</span>
       </div>
-      <div class="app-header__conn">
-        <span class="conn-dot" id="conn-dot"></span>
-        <span id="conn-label" style="font-size:.65rem;color:var(--text-muted);">Conectando...</span>
+      <div class="scr-r">
+        <span class="scr-r__lbl">BCO NÓM</span>
+        <span class="scr-r__val scr-r__val--warn" id="scr-nomina">—</span>
+      </div>
+      <div class="scr-r">
+        <span class="scr-r__lbl">EXCEDENTE/MES</span>
+        <span class="scr-r__val scr-r__val--ok" id="monthly-surplus">—</span>
+      </div>
+      <div class="scr-r">
+        <span class="scr-r__lbl">SCORE BURÓ</span>
+        <span class="scr-r__val" id="buro-score">—</span>
+      </div>
+      <div class="scr-r">
+        <span class="scr-r__lbl">DÍAS 1-OCT</span>
+        <span class="scr-r__val scr-r__val--dim" id="days-to-target">—</span>
+      </div>
+      <div class="scr-r">
+        <span class="scr-r__lbl">DÍAS PIVOTE</span>
+        <span class="scr-r__val scr-r__val--dim" id="days-to-pivote">—</span>
       </div>
     </div>
-    <div class="app-header__actions">
-      <span class="save-status" id="save-status"></span>
-      <button class="btn btn--primary" id="btn-save-all">💾 Guardar</button>
-      <button class="btn btn--danger"  id="btn-revert">↩ Revertir</button>
+
+    <div class="scr-prog">
+      <div class="scr-prog__fill" id="debt-progress-fill" style="width:0%"></div>
     </div>
-  </header>
+    <div class="scr-tag" id="debt-progress-pct">0% LIQUIDADO ▸ META $0 · 01.10.2026</div>
 
-  <!-- COUNTERS -->
-  <section class="section">
-    <div class="counter-grid">
-      <div class="counter-card counter-card--red">
-        <div class="counter-card__label">Deuda total <span class="editable-hint">clic para editar</span></div>
-        <div class="counter-card__value text-red" id="total-debt">—</div>
-        <div class="progress-bar"><div class="progress-bar__fill" id="debt-progress-fill"></div></div>
-        <div class="progress-label" id="debt-progress-pct">0%</div>
+    <!-- Waterfall — generado por drawWaterfall() en app.js -->
+    <div class="wf-wrap">
+      <div class="wf-title">DEUDA PROYECTADA · ABR → OCT 2026</div>
+      <div class="wf-chart" id="wf-chart"></div>
+    </div>
+  </div>
+
+  <!-- ── NAV ── -->
+  <div class="nav">
+    <button class="nav-btn on" data-panel="saldos">SALDOS<span>tarjetas</span></button>
+    <button class="nav-btn"    data-panel="budget">BUDGET<span>presupuesto</span></button>
+    <button class="nav-btn"    data-panel="extras">EXTRAS<span>ingresos+</span></button>
+    <button class="nav-btn"    data-panel="meses">MESES<span>cashflow</span></button>
+    <button class="nav-btn"    data-panel="health">SALUD<span>ratios</span></button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL · SALDOS
+  ══════════════════════════════════════════════════════ -->
+  <div class="panel on panel-scroll" id="panel-saldos">
+
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">SALDOS DE DEUDA</span>
+        <span class="pcard__action">● EDITABLE</span>
       </div>
-      <div class="counter-card counter-card--purple">
-        <div class="counter-card__label">Días al 1-Oct</div>
-        <div class="counter-card__value text-purple" id="days-to-target">—</div>
-        <div class="counter-card__sub">Días al pivote: <strong id="days-to-pivote">—</strong></div>
+      <div id="debt-cards"></div>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">EI — PENDIENTE TOTAL</span>
       </div>
-      <div class="counter-card counter-card--green">
-        <div class="counter-card__label">Excedente / mes</div>
-        <div class="counter-card__value text-green" id="monthly-surplus">—</div>
-        <div class="counter-card__sub">Ingresos − gastos − mínimos</div>
-      </div>
-      <div class="counter-card counter-card--blue">
-        <div class="counter-card__label">Score Buró <span class="editable-hint">clic para editar</span></div>
-        <div class="counter-card__value text-blue" id="buro-score">—</div>
-        <div class="counter-card__sub">100% puntualidad · Jun ~725</div>
-      </div>
-      <div class="counter-card counter-card--yellow">
-        <div class="counter-card__label">Ingresos potenciales</div>
-        <div class="counter-card__value text-yellow" id="ei-total-counter">—</div>
-        <div class="counter-card__sub">Total pendiente por recibir</div>
+      <div class="drow">
+        <div class="drow__lbl">
+          Ingresos adicionales pendientes
+          <span>Alta + media probabilidad</span>
+        </div>
+        <span class="drow__val drow__val--g" id="ei-total-counter">—</span>
       </div>
     </div>
-  </section>
 
-  <!-- DEUDAS -->
-  <section class="section">
-    <h2>Saldos por tarjeta / crédito</h2>
-    <div id="debt-cards"></div>
-  </section>
+  </div>
 
-  <!-- OTROS INGRESOS -->
-  <section class="section">
-    <h2>Otros ingresos potenciales</h2>
-    <div class="card" id="ei-container"><div class="text-muted">Cargando...</div></div>
-  </section>
+  <!-- ══════════════════════════════════════════════════════
+       PANEL · BUDGET
+  ══════════════════════════════════════════════════════ -->
+  <div class="panel panel-scroll" id="panel-budget">
 
-  <!-- PRESUPUESTO -->
-  <section class="section">
-    <h2>Presupuesto base mensual</h2>
-    <div class="card">
-
-      <!-- Fila de totales por categoría -->
-      <div class="budget-totals-row">
-        <div class="budget-total-chip budget-total-chip--green">
-          <div class="btc-label">↑ Ingresos fijos</div>
-          <div class="btc-value text-green" id="budget-total-income">—</div>
-        </div>
-        <div class="budget-total-chip budget-total-chip--red">
-          <div class="btc-label">↓ Gastos fijos</div>
-          <div class="btc-value text-red" id="budget-total-fixed">—</div>
-        </div>
-        <div class="budget-total-chip budget-total-chip--yellow">
-          <div class="btc-label">↓ Gastos variables</div>
-          <div class="btc-value text-yellow" id="budget-total-variable">—</div>
-        </div>
-        <div class="budget-total-chip budget-total-chip--red">
-          <div class="btc-label">↓ Mínimos deuda</div>
-          <div class="btc-value text-red" id="budget-total-mins">—</div>
-        </div>
+    <div class="chips">
+      <div class="chip chip--g">
+        <div class="chip__lbl">↑ Ingresos</div>
+        <div class="chip__val text-green" id="budget-total-income">—</div>
       </div>
-
-      <!-- Detalle expandible -->
-      <div class="budget-detail">
-        <div class="budget-grid">
-          <div class="budget-col">
-            <div class="budget-col__title text-green">↑ Ingresos fijos</div>
-            <table class="budget-table">
-              <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
-              <tbody id="income-body"></tbody>
-            </table>
-          </div>
-          <div class="budget-col">
-            <div class="budget-col__title text-red">↓ Gastos fijos de vida</div>
-            <table class="budget-table">
-              <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
-              <tbody id="fixed-expenses-body"></tbody>
-            </table>
-          </div>
-          <div class="budget-col">
-            <div class="budget-col__title text-yellow">↓ Gastos variables</div>
-            <table class="budget-table">
-              <thead><tr><th>Concepto</th><th>Monto</th><th></th></tr></thead>
-              <tbody id="variable-expenses-body"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="budget-mins">
-          <div class="budget-mins__title text-red">↓ Pagos mínimos de deuda <span class="text-muted">(edita en tarjetas de saldo)</span></div>
-          <table class="budget-table"><tbody id="mins-body"></tbody></table>
-        </div>
+      <div class="chip chip--r">
+        <div class="chip__lbl">↓ Gastos fijos</div>
+        <div class="chip__val text-red" id="budget-total-fixed">—</div>
       </div>
-
-      <!-- Balance del mes -->
-      <div class="budget-balance">
-        <div class="budget-balance__title">Balance del mes</div>
-        <div class="budget-balance__row">
-          <span>Ingresos fijos</span>
-          <span class="text-green" id="bal-income">—</span>
-        </div>
-        <div class="budget-balance__row">
-          <span>− Gastos fijos de vida</span>
-          <span class="text-red" id="bal-fixed">—</span>
-        </div>
-        <div class="budget-balance__row">
-          <span>− Gastos variables</span>
-          <span class="text-yellow" id="bal-variable">—</span>
-        </div>
-        <div class="budget-balance__row">
-          <span>− Mínimos de deuda</span>
-          <span class="text-red" id="bal-mins">—</span>
-        </div>
-        <div class="budget-balance__divider"></div>
-        <div class="budget-balance__result" id="bal-result-row">
-          <span>💜 Excedente para abono extra</span>
-          <span id="budget-surplus">—</span>
-        </div>
-        <div class="budget-balance__formula">
-          Ingresos − gastos de vida − mínimos de deuda = excedente para abono extra a capital
-        </div>
+      <div class="chip chip--y">
+        <div class="chip__lbl">↓ Variables</div>
+        <div class="chip__val text-yellow" id="budget-total-variable">—</div>
       </div>
-
+      <div class="chip chip--r">
+        <div class="chip__lbl">↓ Mínimos</div>
+        <div class="chip__val text-red" id="budget-total-mins">—</div>
+      </div>
     </div>
-  </section>
 
-  <!-- SUSCRIPCIONES -->
-  <section class="section">
-    <h2>Suscripciones mensuales</h2>
-    <div class="card">
+    <div class="pcard">
+      <div class="pcard__hdr"><span class="pcard__title">BALANCE DEL MES</span></div>
+      <table class="bal-table">
+        <tr><td>↑ Ingresos</td><td class="text-green" id="bal-income">—</td></tr>
+        <tr><td>↓ Gastos fijos vida</td><td class="text-red" id="bal-fixed">—</td></tr>
+        <tr><td>↓ Gastos variables</td><td class="text-yellow" id="bal-variable">—</td></tr>
+        <tr><td>↓ Mínimos deuda</td><td class="text-red" id="bal-mins">—</td></tr>
+        <tr id="bal-result-row" class="surplus-row">
+          <td><span>💜 Excedente para abono extra</span></td>
+          <td id="budget-surplus">—</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">INGRESOS</span>
+        <span class="pcard__action">● EDITABLE</span>
+      </div>
+      <table class="budget-table"><tbody id="income-body"></tbody></table>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">GASTOS FIJOS</span>
+        <span class="pcard__action">● EDITABLE</span>
+      </div>
+      <table class="budget-table"><tbody id="fixed-expenses-body"></tbody></table>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">GASTOS VARIABLES</span>
+        <span class="pcard__action">● EDITABLE</span>
+      </div>
+      <table class="budget-table"><tbody id="variable-expenses-body"></tbody></table>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr"><span class="pcard__title">MÍNIMOS DE DEUDA</span></div>
+      <table class="budget-table"><tbody id="mins-body"></tbody></table>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">SUSCRIPCIONES</span>
+        <span class="pcard__action">● EDITABLE</span>
+      </div>
       <table class="subs-table">
         <thead>
-          <tr><th>Servicio</th><th class="text-right">Inicio</th><th class="text-right">Actual</th><th>Nota</th><th></th></tr>
+          <tr>
+            <th>Servicio</th>
+            <th>Abr-2026</th>
+            <th>Actual</th>
+            <th></th>
+          </tr>
         </thead>
         <tbody id="subs-tbody"></tbody>
         <tfoot><tr id="subs-tfoot"></tr></tfoot>
       </table>
     </div>
-  </section>
 
-  <!-- PLAN MENSUAL -->
-  <section class="section">
-    <h2>Plan mensual — Abr → Oct 2026</h2>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL · EXTRAS — Ingresos Extraordinarios
+  ══════════════════════════════════════════════════════ -->
+  <div class="panel panel-scroll" id="panel-extras">
+
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">INGRESOS ADICIONALES</span>
+      </div>
+      <div id="ei-container"></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL · MESES — Cashflow mensual
+  ══════════════════════════════════════════════════════ -->
+  <div class="panel panel-scroll" id="panel-meses">
+
     <div id="monthly-plan"></div>
-  </section>
 
-  <!-- TIMELINE -->
-  <section class="section">
-    <h2>Timeline hipoteca · Banamex $1.7M + Infonavit $1M</h2>
-    <div class="card">
-      <div class="timeline" id="timeline"></div>
-      <div class="pm-note" style="margin-top:1rem;">
-        Score: <strong class="text-blue" id="buro-score-note">685</strong> ·
-        Jun: <strong class="text-green">~725</strong> ·
-        Ago: <strong class="text-green">~745</strong> ·
-        Cuota: <strong>~$25,000/mes</strong> · Preaprobado: <strong class="text-green">✅</strong>
+    <div class="pcard" style="margin-top:.5rem;">
+      <div class="pcard__hdr"><span class="pcard__title">TIMELINE CLAVE</span></div>
+      <div id="timeline"></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL · SALUD — Ratios + Escenarios + Historial
+  ══════════════════════════════════════════════════════ -->
+  <div class="panel panel-scroll" id="panel-health">
+
+    <div class="health">
+      <div id="hi-ratio"   class="hi hi--r"><div class="hi__lbl">DEUDA/ING</div><div class="hi__val" id="ratio-debt-income">—</div></div>
+      <div id="hi-burden"  class="hi hi--r"><div class="hi__lbl">MÍN/ING</div><div class="hi__val" id="ratio-burden">—</div></div>
+      <div id="hi-surplus" class="hi hi--y"><div class="hi__lbl">EXCEDENTE%</div><div class="hi__val" id="ratio-surplus">—</div></div>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr"><span class="pcard__title">¿QUÉ PASA SI? ESCENARIOS</span></div>
+      <div class="scen-row">
+        <span class="scen-row__lbl">PTU llega $15k menos</span>
+        <label class="tog"><input type="checkbox" id="scen-1" onchange="recalcScenarios()"><span class="tog__sl"></span></label>
+      </div>
+      <div class="scen-row">
+        <span class="scen-row__lbl">Mínimo Banorte sube $2k/mes</span>
+        <label class="tog"><input type="checkbox" id="scen-2" onchange="recalcScenarios()"><span class="tog__sl"></span></label>
+      </div>
+      <div class="scen-row">
+        <span class="scen-row__lbl">Apoyo pareja $200k activo</span>
+        <label class="tog"><input type="checkbox" id="scen-3" onchange="recalcScenarios()"><span class="tog__sl"></span></label>
+      </div>
+      <div class="scen-row">
+        <span class="scen-row__lbl">Airbnb Mundial activo</span>
+        <label class="tog"><input type="checkbox" id="scen-4" onchange="recalcScenarios()"><span class="tog__sl"></span></label>
+      </div>
+      <hr class="cf-div">
+      <div class="drow">
+        <div class="drow__lbl">Deuda estimada 1-Oct<span>Con escenarios activos</span></div>
+        <span class="drow__val drow__val--g" id="scen-oct">$0</span>
       </div>
     </div>
-  </section>
 
-  <!-- HISTORIAL -->
-  <section class="section">
-    <h2>Historial de cambios</h2>
-    <div class="card"><div id="history-log"><div class="text-muted">Cargando...</div></div></div>
-  </section>
+    <div class="pcard">
+      <div class="pcard__hdr">
+        <span class="pcard__title">HISTORIAL DE CAMBIOS</span>
+        <button class="pcard__action" id="btn-refresh-history">↺ ACTUALIZAR</button>
+      </div>
+      <div id="history-log">
+        <div class="text-muted" style="font-size:.6rem;">Cargando...</div>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard__hdr"><span class="pcard__title">ESTADO</span></div>
+      <div class="drow">
+        <div class="drow__lbl">Último guardado<span id="last-updated">—</span></div>
+        <span class="save-status" id="save-status"></span>
+      </div>
+      <div class="drow">
+        <div class="drow__lbl">Buró actualizado<span>Puntualidad 100%</span></div>
+        <span class="drow__val">9-Abr-2026</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── ACTION BAR ── -->
+  <div class="actions">
+    <button class="act-btn" id="btn-revert">↩ REVERT</button>
+    <button class="act-btn act-btn--save" id="btn-save-all">💾 SAVE</button>
+  </div>
+  <div class="save-tag" id="save-tag"></div>
 
 </div>
-<div id="toast"></div>
+<!-- /calc -->
+
+<!-- ============================================================
+     SCRIPTS — Orden crítico: config.js → sheets.js → app.js
+============================================================ -->
 <script src="js/config.js"></script>
 <script src="js/sheets.js"></script>
 <script src="js/app.js"></script>
+
 </body>
 </html>
