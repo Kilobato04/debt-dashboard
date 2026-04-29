@@ -26,65 +26,50 @@ var EI = {
 // ── MONTH NOTES STATE ─────────────────────────────────────
 var MONTH_NOTES = {};
 
-// ── WATERFALL DATA ────────────────────────────────────────
-// Proyección deuda al inicio de cada mes — actualizar al registrar pagos
-var WF_MONTHS = [
-  { m: "ABR", debtStart: 419482 },
-  { m: "MAY", debtStart: 350992 },
-  { m: "JUN", debtStart: 282502 },
-  { m: "JUL", debtStart: 225278 },
-  { m: "AGO", debtStart: 169435 },
-  { m: "SEP", debtStart: 113592 },
-  { m: "OCT", debtStart: 0      }
-];
+// ── WATERFALL — proyección dinámica ───────────────────────
+// Se genera en drawWaterfall() desde deuda actual + EI + surplus por mes
+// No hay datos hardcodeados aquí.
 
 // ── MONTHLY PLAN DATA ─────────────────────────────────────
+// MONTHS_DEF — esqueleto estructural por mes
+// · nomina/gastos: calculados en tiempo real desde CALC en renderMonthlyPlan()
+// · extraExpenses: pagos extra de deuda específicos de ese mes (ej. corte Nu, pivote)
+//   Estos son los únicos valores "especiales por mes" que no se pueden derivar de CALC
+// · EI: inyectados dinámicamente desde EI.items via eiForMonth()
 var MONTHS_DEF = [
   {
-    id: "apr", label: "Abril", emoji: "🔴", status: "urgent",
-    income:   [["Nómina neta", 79988], ["Hermana (15-Abr)", 2500], ["Hermana (fin-Abr)", 2000]],
-    expenses: [["Gastos fijos+variables", -30321], ["TDC Banamex", -14892], ["Banorte mínimo", -13544], ["Nu corte", -11941], ["Bco Nómina mín", -4092]],
-    surplus:  9798,
+    id: "apr", label: "Abril", emoji: "🔴", status: "urgent", ym: "2026-04",
+    extraExpenses: [["TDC Banamex (corte)", -14892]],  // corte especial de abril
     balances: { banorte: 250676, banamexNomina: 152000 }
   },
   {
-    id: "may", label: "Mayo", emoji: "🟣", status: "key",
-    income:   [["Nómina + vales", 83388], ["★ PTU Arcadis", 45000]],
-    expenses: [["Gastos fijos+variables", -30321], ["Banorte mínimo", -13544], ["Nu corte", -11941], ["Bco Nómina mín", -4092]],
-    surplus:  68490,
+    id: "may", label: "Mayo", emoji: "🟣", status: "key", ym: "2026-05",
+    extraExpenses: [],
     balances: { banorte: 250676, banamexNomina: 69000 }
   },
   {
-    id: "jun", label: "Junio", emoji: "🔄", status: "pivot",
-    income:   [["Nómina + offcycle", 86388], ["★ Smability (1a)", 30000]],
-    expenses: [["Gastos fijos+variables", -30321], ["Banorte mínimo", -13544], ["Bco Nómina mín", -4092]],
-    surplus:  68431,
+    id: "jun", label: "Junio", emoji: "🔄", status: "pivot", ym: "2026-06",
+    extraExpenses: [],
     balances: { banorte: 70000, banamexNomina: 180000 },
-    pivote:   true
+    pivote: true
   },
   {
-    id: "jul", label: "Julio", emoji: "🟢", status: "good",
-    income:   [["Nómina + offcycle", 86388], ["★ Smability (2a)", 20000]],
-    expenses: [["Gastos fijos+variables", -30321], ["Cuota Banamex", -5500]],
-    surplus:  70567,
+    id: "jul", label: "Julio", emoji: "🟢", status: "good", ym: "2026-07",
+    extraExpenses: [["Cuota Banamex (ajuste)", -5500]],
     balances: { banorte: 15000, banamexNomina: 188000 }
   },
   {
-    id: "aug", label: "Agosto", emoji: "🟢", status: "good",
-    income:   [["Nómina + offcycle", 86388], ["★ Smability (3a)", 30000]],
-    expenses: [["Gastos (sin Amazon)", -30246], ["Cerrar Banorte", -15000]],
-    surplus:  71142,
+    id: "aug", label: "Agosto", emoji: "🟢", status: "good", ym: "2026-08",
+    extraExpenses: [["Cerrar Banorte", -15000]],
     balances: { banorte: 0, banamexNomina: 118000 }
   },
   {
-    id: "sep", label: "Septiembre", emoji: "🟢", status: "good",
-    income:   [["Nómina + offcycle", 86388], ["★ Apoyo familiar", 35000]],
-    expenses: [["Gastos fijos+variables", -30321]],
-    surplus:  91067,
+    id: "sep", label: "Septiembre", emoji: "🟢", status: "good", ym: "2026-09",
+    extraExpenses: [],
     balances: { banorte: 0, banamexNomina: 38000 }
   },
   {
-    id: "oct", label: "1-Oct · META 🏁", emoji: "🏁", status: "win",
+    id: "oct", label: "1-Oct · META 🏁", emoji: "🏁", status: "win", ym: "2026-10",
     balances: { banorte: 0, banamexNomina: 0 }
   }
 ];
@@ -135,33 +120,53 @@ function renderAll() {
   renderExtraordinaryIncome();
   renderMonthlyPlan();
   renderTimeline();
+  drawWaterfall();        // recalcula proyección con datos actuales
   loadHistory();
   updateTimestamp();
 }
 
 // ============================================================
-// WATERFALL CHART
+// WATERFALL CHART — proyección dinámica desde datos reales
+// deuda(mes+1) = deuda(mes) - surplusForDebt(ym) - EI_alta_prob(ym)
 // ============================================================
 function drawWaterfall() {
   var c = document.getElementById("wf-chart");
   if (!c) return;
-  var maxDebt = 419482;
-  var H       = 80;
+
+  var meses  = ["2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10"];
+  var labels = ["ABR","MAY","JUN","JUL","AGO","SEP","OCT"];
+  var deuda  = CALC.totalDebt();
+  var puntos = [];
+
+  meses.forEach(function (ym, i) {
+    puntos.push({ m: labels[i], debtStart: Math.max(0, Math.round(deuda)) });
+    if (i < meses.length - 1) {
+      var surplus = CALC.surplusForDebt(ym);
+      var eiMes   = EI.items
+        .filter(function (it) {
+          return it.date && it.date.substring(0,7) === ym
+            && it.prob === "alta" && it.status === "pendiente";
+        })
+        .reduce(function (s, it) { return s + (parseFloat(it.amount)||0); }, 0);
+      deuda = Math.max(0, deuda - surplus - eiMes);
+    }
+  });
+
+  var maxDebt = puntos[0].debtStart || CONFIG.debtBaseline || 443499;
+  var H = 80;
   c.innerHTML = "";
 
-  WF_MONTHS.forEach(function (d) {
+  puntos.forEach(function (d) {
     var barH = d.debtStart === 0
-      ? 4
-      : Math.max(4, Math.round((d.debtStart / maxDebt) * H));
-    var cls = d.debtStart === 0   ? "wf-bar--zero"
-            : d.debtStart > 250000 ? "wf-bar--high"
-            : d.debtStart > 120000 ? "wf-bar--mid"
-            : "wf-bar--low";
-    var valTxt = d.debtStart === 0
-      ? "$0"
-      : d.debtStart >= 1000
-        ? "$" + Math.round(d.debtStart / 1000) + "k"
-        : "$" + d.debtStart;
+      ? 4 : Math.max(4, Math.round((d.debtStart / maxDebt) * H));
+    var cls = d.debtStart === 0
+      ? "wf-bar--zero"
+      : d.debtStart > maxDebt * 0.6 ? "wf-bar--high"
+      : d.debtStart > maxDebt * 0.3 ? "wf-bar--mid"
+      : "wf-bar--low";
+    var valTxt = d.debtStart === 0 ? "$0"
+      : d.debtStart >= 1000 ? "$" + Math.round(d.debtStart/1000) + "k"
+      : "$" + d.debtStart;
 
     var wrap = document.createElement("div");
     wrap.className = "wf-bar-wrap";
@@ -229,14 +234,23 @@ async function loadExtraordinaryIncome() {
       }));
     } else {
       // Defaults si Sheets está vacío
+      // REGLA: TODO ingreso extra vive aquí — el cashflow de cada mes lo lee dinámicamente
       EI.fromArray([
-        { id:1, desc:"PTU Arcadis",    amount:45000,  date:"2026-05-30", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"Puede ser mayor" },
-        { id:2, desc:"Smability (1a)", amount:30000,  date:"2026-06-15", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"" },
-        { id:3, desc:"Smability (2a)", amount:20000,  date:"2026-07-15", target:"banorte",       status:"pendiente", prob:"alta",  notes:"" },
-        { id:4, desc:"Smability (3a)", amount:30000,  date:"2026-08-15", target:"banorte",       status:"pendiente", prob:"alta",  notes:"" },
-        { id:5, desc:"Apoyo familiar", amount:35000,  date:"2026-09-30", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"" },
-        { id:6, desc:"Apoyo pareja",   amount:200000, date:"2026-06-30", target:"banorte",       status:"pendiente", prob:"media", notes:"$100k May + $100k Jun" },
-        { id:7, desc:"Airbnb Mundial", amount:30000,  date:"2026-07-01", target:"libre",         status:"pendiente", prob:"baja",  notes:"~20 noches" }
+        // ── ABRIL ─────────────────────────────────────────────
+        { id:1,  desc:"Hermana (1a quincena Abr)", amount:2500,  date:"2026-04-15", target:"libre",         status:"pendiente", prob:"alta",  notes:"Apoyo fijo mensual" },
+        { id:2,  desc:"Hermana (fin Abr)",         amount:2000,  date:"2026-04-30", target:"libre",         status:"pendiente", prob:"alta",  notes:"Apoyo fijo mensual" },
+        // ── MAYO ──────────────────────────────────────────────
+        { id:3,  desc:"PTU Arcadis",               amount:45000, date:"2026-05-30", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"Puede ser mayor" },
+        // ── JUNIO ─────────────────────────────────────────────
+        { id:4,  desc:"Smability (1a)",            amount:30000, date:"2026-06-15", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"" },
+        { id:5,  desc:"Apoyo pareja (Jun)",         amount:40000, date:"2026-06-30", target:"banorte",       status:"pendiente", prob:"media", notes:"Parte del apoyo total acordado" },
+        // ── JULIO ─────────────────────────────────────────────
+        { id:6,  desc:"Smability (2a)",            amount:20000, date:"2026-07-15", target:"banorte",       status:"pendiente", prob:"alta",  notes:"" },
+        { id:7,  desc:"Airbnb Mundial",            amount:30000, date:"2026-07-01", target:"libre",         status:"pendiente", prob:"baja",  notes:"~20 noches. Decisión con pareja" },
+        // ── AGOSTO ────────────────────────────────────────────
+        { id:8,  desc:"Smability (3a)",            amount:30000, date:"2026-08-15", target:"banorte",       status:"pendiente", prob:"alta",  notes:"" },
+        // ── SEPTIEMBRE ────────────────────────────────────────
+        { id:9,  desc:"Apoyo familiar",            amount:35000, date:"2026-09-30", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"" },
       ]);
     }
     sessionStorage.setItem("debt_ei", JSON.stringify(EI.items));
@@ -737,6 +751,14 @@ async function deleteEI(id) {
 
 // ============================================================
 // RENDER — MONTHLY PLAN (panel Meses)
+// ── HELPER: EI del mes filtrado por ym ────────────────────
+// Incluye alta+media prob — baja se omite del cashflow
+function eiForMonth(ym) {
+  return EI.items.filter(function (i) {
+    return i.date && i.date.substring(0, 7) === ym && i.prob !== "baja";
+  });
+}
+
 // ============================================================
 function renderMonthlyPlan() {
   var c = document.getElementById("monthly-plan");
@@ -749,6 +771,21 @@ function renderMonthlyPlan() {
     div.id        = "month-" + m.id;
     var savedNote = MONTH_NOTES[m.id] || "";
 
+    // ── Entradas desde CALC + EI ─────────────────────────────
+    var nomina    = CALC.monthlyIncome(m.ym);           // nómina real del mes
+    var eiItems   = m.ym ? eiForMonth(m.ym) : [];
+    var eiTotal   = eiItems.reduce(function (s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
+
+    // ── Salidas desde CALC + mínimos reales + extras del mes ─
+    var fixed     = CALC.totalFixed();
+    var variable  = CALC.totalVariable();
+    var mins      = CALC.totalMinPayments();
+    var extraExp  = (m.extraExpenses || []).reduce(function (s, r) { return s + (r[1] || 0); }, 0);
+    var totalOut  = fixed + variable + mins + extraExp;  // todo negativo
+
+    // ── Surplus real ─────────────────────────────────────────
+    var surplus   = nomina + eiTotal - totalOut;
+
     var html =
       '<div class="month-block__header">' +
         '<div class="month-block__title">' + m.emoji + " " + m.label + '</div>' +
@@ -758,23 +795,48 @@ function renderMonthlyPlan() {
         '</div>' +
       '</div>';
 
-    if (m.income) {
+    // ── Panel entradas ───────────────────────────────────────
+    if (m.ym) {
       html += '<div class="month-block__section"><div class="month-section-title">↑ Entradas</div>';
-      m.income.forEach(function (r) {
-        var isExtra = r[0].startsWith("★");
-        html += '<div class="month-row"><span style="' + (isExtra ? "color:var(--cg)" : "") + '">' + r[0] + '</span><span class="text-green">+' + fmt(r[1]) + '</span></div>';
+
+      // Nómina desde CALC
+      var nominaLabel = m.ym >= "2026-06" ? "Nómina + offcycle + vales" : m.ym >= "2026-05" ? "Nómina + vales" : "Nómina neta";
+      html += '<div class="month-row"><span>' + nominaLabel + '</span><span class="text-green">+' + fmt(nomina) + '</span></div>';
+
+      // EI del mes — dinámico, cada item con indicador de prob y estado
+      eiItems.forEach(function (i) {
+        var isMed   = i.prob === "media";
+        var isDone  = i.status === "recibido";
+        var valCls  = isDone ? "text-muted" : isMed ? "text-yellow" : "text-green";
+        var icon    = isDone ? "✅" : isMed ? "◐" : "★";
+        html += '<div class="month-row">' +
+          '<span style="color:' + (isMed ? 'var(--cy)' : 'var(--cg)') + '">' + icon + ' ' + escHtml(i.desc) + '</span>' +
+          '<span class="' + valCls + '">+' + fmt(i.amount) + '</span>' +
+        '</div>';
       });
+
       html += '</div>';
-    }
-    if (m.expenses) {
+
+      // ── Panel salidas ─────────────────────────────────────
       html += '<div class="month-block__section"><div class="month-section-title">↓ Salidas</div>';
-      m.expenses.forEach(function (r) {
+      html += '<div class="month-row"><span>Gastos fijos vida</span><span class="text-red">-' + fmt(fixed) + '</span></div>';
+      html += '<div class="month-row"><span>Gastos variables</span><span class="text-red">-' + fmt(variable) + '</span></div>';
+      html += '<div class="month-row"><span>Mínimos deuda</span><span class="text-red">-' + fmt(mins) + '</span></div>';
+
+      // Pagos extra específicos del mes (ej. corte especial, cierre Banorte)
+      (m.extraExpenses || []).forEach(function (r) {
         html += '<div class="month-row"><span>' + r[0] + '</span><span class="text-red">' + fmt(r[1]) + '</span></div>';
       });
       html += '</div>';
+
+      // ── Surplus ───────────────────────────────────────────
+      html += '<div class="month-block__surplus">' +
+        '<span>Excedente para deuda</span>' +
+        '<span style="color:' + (surplus >= 0 ? 'var(--cp)' : 'var(--cr)') + '">' + fmt(surplus) + '</span>' +
+      '</div>';
     }
-    if (m.surplus)  html += '<div class="month-block__surplus"><span>Excedente para deuda</span><span>' + fmt(m.surplus) + '</span></div>';
-    if (m.pivote)   html += '<div class="month-block__pivote">🔄 30-Jun: Banamex $0 → Redisponer $180k → SPEI → Banorte</div>';
+
+    if (m.pivote)           html += '<div class="month-block__pivote">🔄 30-Jun: Banamex $0 → Redisponer $180k → SPEI → Banorte</div>';
     if (m.status === "win") html += '<div class="month-block__win">🎯 Banorte $0 · Banamex $0 · Nu flujo · Hipoteca activa ✅</div>';
 
     html +=
@@ -853,16 +915,59 @@ async function loadHistory() {
 
 // ============================================================
 // SCENARIOS (panel Salud)
+// Calcula deuda estimada al 1-Oct según toggles activos.
+// Base = deuda actual. Cada toggle ajusta EI o gastos.
 // ============================================================
 function recalcScenarios() {
+  // Base: deuda actual total
+  var base = CALC.totalDebt();
+
+  // Surplus mensual base × meses restantes hasta Oct
+  var hoy       = new Date();
+  var oct       = new Date("2026-10-01");
+  var mesesLeft = Math.max(1, Math.round((oct - hoy) / (1000 * 60 * 60 * 24 * 30.5)));
+  var surplusBase = CALC.surplusForDebt() * mesesLeft;
+
+  // EI alta+media prob pendiente (ya en el plan base)
+  var eiBase = EI.items
+    .filter(function (i) { return i.status === "pendiente" && i.prob !== "baja"; })
+    .reduce(function (s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
+
+  // Ajustes por escenario
   var adj = 0;
-  if (chk("scen-1")) adj += 15000;   // PTU llega $15k menos
-  if (chk("scen-2")) adj += 24000;   // Mínimo Banorte sube $2k × 12 meses
-  if (chk("scen-3")) adj -= 200000;  // Apoyo pareja activo
-  if (chk("scen-4")) adj -= 30000;   // Airbnb activo
-  var oct = Math.max(0, 0 + adj);
-  var el  = document.getElementById("scen-oct");
-  if (el) { el.textContent = fmt(oct); el.className = "drow__val " + (oct > 0 ? "drow__val--r" : "drow__val--g"); }
+
+  // Toggle 1: PTU llega $15k menos
+  if (chk("scen-1")) {
+    var ptu = EI.items.find(function (i) { return i.desc.toLowerCase().includes("ptu"); });
+    adj -= ptu ? Math.min(15000, ptu.amount) : 15000;
+  }
+
+  // Toggle 2: Mínimo Banorte sube $2k — impacta surplus los meses restantes
+  if (chk("scen-2")) adj -= 2000 * mesesLeft;
+
+  // Toggle 3: Apoyo pareja activo — suma EI de baja prob con "pareja"
+  if (chk("scen-3")) {
+    var pareja = EI.items.filter(function (i) {
+      return i.desc.toLowerCase().includes("pareja") && i.prob === "baja";
+    });
+    adj += pareja.reduce(function (s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
+    // Si no hay ninguno en baja, tomar cualquier pareja pendiente como adicional
+    if (!pareja.length) adj += 200000;
+  }
+
+  // Toggle 4: Airbnb activo — suma EI de baja prob con "airbnb"
+  if (chk("scen-4")) {
+    var airbnb = EI.items.find(function (i) { return i.desc.toLowerCase().includes("airbnb"); });
+    adj += airbnb ? parseFloat(airbnb.amount) || 30000 : 30000;
+  }
+
+  // Deuda estimada = base - surplus_base - ei_base - ajustes_positivos + ajustes_negativos
+  var deudaOct = Math.max(0, base - surplusBase - eiBase - adj);
+  var el = document.getElementById("scen-oct");
+  if (el) {
+    el.textContent = fmt(deudaOct);
+    el.className   = "drow__val " + (deudaOct > 0 ? "drow__val--r" : "drow__val--g");
+  }
 }
 
 function chk(id) { var el = document.getElementById(id); return el && el.checked; }
