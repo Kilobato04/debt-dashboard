@@ -286,23 +286,41 @@ async function loadMonthNotes() {
 
 async function loadConfigFromSheets() {
   try {
+    // 1. Cache local primero → render rápido con últimos valores guardados
+    var cached = sessionStorage.getItem("debt_user_config");
+    if (cached) {
+      applyUserConfig(JSON.parse(cached));
+    }
+
+    // 2. Refrescar desde Sheets en background
     var r = await SHEETS.getHistory("user_config");
     if (!r.success || !r.data || !r.data.length) return;
+
+    // Construir objeto plano para cache
+    var configCache = {};
     r.data.forEach(function (row) {
-      try {
-        if (row.section === "fixedExpenses")    CONFIG.fixedExpenses    = JSON.parse(row.payload);
-        if (row.section === "variableExpenses") CONFIG.variableExpenses = JSON.parse(row.payload);
-        if (row.section === "subscriptions")    CONFIG.subscriptions    = JSON.parse(row.payload);
-        if (row.section === "income")           Object.assign(CONFIG.income, JSON.parse(row.payload));
-        if (row.section === "debtMeta") {
-          var meta = JSON.parse(row.payload);
-          Object.keys(meta).forEach(function (k) {
-            if (CONFIG.debts[k]) Object.assign(CONFIG.debts[k], meta[k]);
-          });
-        }
-      } catch (_) {}
+      try { configCache[row.section] = JSON.parse(row.payload); } catch (_) {}
     });
+
+    applyUserConfig(configCache);
+    sessionStorage.setItem("debt_user_config", JSON.stringify(configCache));
   } catch (e) { console.warn("loadConfig:", e.message); }
+}
+
+// Aplica un objeto {section: payload} a CONFIG
+function applyUserConfig(cfg) {
+  if (!cfg) return;
+  try {
+    if (cfg.fixedExpenses)    CONFIG.fixedExpenses    = cfg.fixedExpenses;
+    if (cfg.variableExpenses) CONFIG.variableExpenses = cfg.variableExpenses;
+    if (cfg.subscriptions)    CONFIG.subscriptions    = cfg.subscriptions;
+    if (cfg.income)           Object.assign(CONFIG.income, cfg.income);
+    if (cfg.debtMeta) {
+      Object.keys(cfg.debtMeta).forEach(function (k) {
+        if (CONFIG.debts[k]) Object.assign(CONFIG.debts[k], cfg.debtMeta[k]);
+      });
+    }
+  } catch (_) {}
 }
 
 // ============================================================
@@ -541,12 +559,14 @@ function renderBudgetTable(tbodyId, items, saveCallback) {
 
 async function saveBudgetFixed(items) {
   CONFIG.fixedExpenses = items;
+  persistUserConfigCache("fixedExpenses", items);
   await SHEETS.saveConfig("fixedExpenses", JSON.stringify(items), "Gastos fijos actualizados");
   await saveAll("Gastos fijos actualizados");
   renderBudget(); renderCounters();
 }
 async function saveBudgetVariable(items) {
   CONFIG.variableExpenses = items;
+  persistUserConfigCache("variableExpenses", items);
   await SHEETS.saveConfig("variableExpenses", JSON.stringify(items), "Gastos variables actualizados");
   await saveAll("Gastos variables actualizados");
   renderBudget(); renderCounters();
@@ -554,16 +574,27 @@ async function saveBudgetVariable(items) {
 async function saveBudgetIncome(items) {
   items.forEach(function (i) {
     if (i.id === "nomina") {
-      // Actualiza ambas nóminas para que sea consistente en cualquier mes
       CONFIG.income.nomina            = i.amount;
       CONFIG.income.nominaPreOffcycle = i.amount;
     }
     if (i.id === "vales") CONFIG.income.vales = i.amount;
     if (i.id === "otros") CONFIG.income.otros = i.amount;
   });
+  // Persistir en sessionStorage inmediatamente — independiente de Sheets
+  persistUserConfigCache("income", CONFIG.income);
   await SHEETS.saveConfig("income", JSON.stringify(CONFIG.income), "Ingresos actualizados");
   await saveAll("Ingresos actualizados");
   renderBudget(); renderCounters(); renderMonthlyPlan();
+}
+
+// ── Helper: actualiza una sección del cache user_config ──────
+function persistUserConfigCache(section, value) {
+  try {
+    var cached = sessionStorage.getItem("debt_user_config");
+    var cfg    = cached ? JSON.parse(cached) : {};
+    cfg[section] = value;
+    sessionStorage.setItem("debt_user_config", JSON.stringify(cfg));
+  } catch (_) {}
 }
 
 // ============================================================
