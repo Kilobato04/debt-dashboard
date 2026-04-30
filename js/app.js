@@ -128,31 +128,47 @@ function renderAll() {
 // ============================================================
 // WATERFALL CHART — proyección dinámica desde datos reales
 // deuda(mes+1) = deuda(mes) - surplusForDebt(ym) - EI_alta_prob(ym)
+// buildProjection() cachea los puntos en WF_PROJECTION para que
+// renderMonthlyPlan() los use como balances dinámicos.
 // ============================================================
-function drawWaterfall() {
-  var c = document.getElementById("wf-chart");
-  if (!c) return;
+var WF_PROJECTION = [];
 
+function buildProjection() {
   var meses  = ["2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10"];
   var labels = ["ABR","MAY","JUN","JUL","AGO","SEP","OCT"];
   var deuda  = CALC.totalDebt();
   var puntos = [];
 
   meses.forEach(function (ym, i) {
-    puntos.push({ m: labels[i], debtStart: Math.max(0, Math.round(deuda)) });
+    puntos.push({ m: labels[i], ym: ym, debtStart: Math.max(0, Math.round(deuda)) });
     if (i < meses.length - 1) {
       var surplus = CALC.surplusForDebt(ym);
       var eiMes   = EI.items
         .filter(function (it) {
-          var d = normalizeDate(it.date);
-          return d && d.substring(0,7) === ym
-            && it.prob === "alta" && it.status === "pendiente";
+          var d    = normalizeDate(it.date);
+          var prob = (it.prob || "").toLowerCase().trim();
+          return d && d.substring(0,7) === ym && prob === "alta" && it.status === "pendiente";
         })
         .reduce(function (s, it) { return s + (parseFloat(it.amount)||0); }, 0);
       deuda = Math.max(0, deuda - surplus - eiMes);
     }
   });
 
+  WF_PROJECTION = puntos;
+  return puntos;
+}
+
+// Deuda proyectada al inicio de un mes (ym = "2026-04" etc.)
+function projectedDebtForYM(ym) {
+  var p = WF_PROJECTION.find(function (x) { return x.ym === ym; });
+  return p ? p.debtStart : null;
+}
+
+function drawWaterfall() {
+  var c = document.getElementById("wf-chart");
+  if (!c) return;
+
+  var puntos  = buildProjection();
   var maxDebt = puntos[0].debtStart || CONFIG.debtBaseline || 443499;
   var H = 80;
   c.innerHTML = "";
@@ -315,6 +331,13 @@ function applyUserConfig(cfg) {
     if (cfg.variableExpenses) CONFIG.variableExpenses = cfg.variableExpenses;
     if (cfg.subscriptions)    CONFIG.subscriptions    = cfg.subscriptions;
     if (cfg.income)           Object.assign(CONFIG.income, cfg.income);
+    if (cfg.extraExpenses) {
+      // Sobreescribir extraExpenses de cada mes desde Sheets
+      cfg.extraExpenses.forEach(function (row) {
+        var m = MONTHS_DEF.find(function (x) { return x.id === row.monthId; });
+        if (m) m.extraExpenses = row.items || [];
+      });
+    }
     if (cfg.debtMeta) {
       Object.keys(cfg.debtMeta).forEach(function (k) {
         if (CONFIG.debts[k]) Object.assign(CONFIG.debts[k], cfg.debtMeta[k]);
@@ -872,12 +895,22 @@ function renderMonthlyPlan() {
     // ── Surplus real ─────────────────────────────────────────
     var surplus   = nomina + eiTotal - totalOut;
 
+    // Balances proyectados dinámicamente desde buildProjection()
+    var proyDeuda = projectedDebtForYM(m.ym);
+    // Si hay proyección disponible, usarla; si no, usar balances del plan como referencia
+    var balBanorte = (proyDeuda !== null)
+      ? Math.max(0, Math.round(Math.min(proyDeuda, CONFIG.debts.banorte.balance)))
+      : m.balances.banorte;
+    var balNomina  = (proyDeuda !== null)
+      ? Math.max(0, Math.round(Math.min(proyDeuda, CONFIG.debts.banamexNomina.balance)))
+      : m.balances.banamexNomina;
+
     var html =
       '<div class="month-block__header">' +
         '<div class="month-block__title">' + m.emoji + " " + m.label + '</div>' +
         '<div class="month-block__badges">' +
-          badge(m.balances.banorte > 0       ? "red"    : "green", "BNRT " + fmtK(m.balances.banorte)) +
-          badge(m.balances.banamexNomina > 0 ? "yellow" : "green", "NÓM "  + fmtK(m.balances.banamexNomina)) +
+          badge(balBanorte > 0 ? "red"    : "green", "BNRT " + fmtK(balBanorte)) +
+          badge(balNomina  > 0 ? "yellow" : "green", "NÓM "  + fmtK(balNomina)) +
         '</div>' +
       '</div>';
 
@@ -924,6 +957,29 @@ function renderMonthlyPlan() {
 
     if (m.pivote)           html += '<div class="month-block__pivote">🔄 30-Jun: Banamex $0 → Redisponer $180k → SPEI → Banorte</div>';
     if (m.status === "win") html += '<div class="month-block__win">🎯 Banorte $0 · Banamex $0 · Nu flujo · Hipoteca activa ✅</div>';
+
+    // ── Pagos extra editables (cortes especiales, cierres, etc.) ─
+    if (m.ym) {
+      html += '<div class="month-extra-edit" id="extra-edit-' + m.id + '">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:.4rem;">' +
+          '<span style="font-size:.48rem;color:var(--sd);letter-spacing:.08em;text-transform:uppercase;">Pagos extra del mes</span>' +
+          '<button class="month-note-save" data-month-extra="' + m.id + '" style="font-size:.48rem;">+ Agregar</button>' +
+        '</div>' +
+        '<div id="extra-items-' + m.id + '">' +
+          (m.extraExpenses || []).map(function (r, idx) {
+            return '<div class="extra-item-row" style="display:flex;gap:.35rem;margin-top:.25rem;align-items:center;">' +
+              '<input class="budget-input budget-input--label" style="flex:1;" ' +
+                'id="extra-label-' + m.id + '-' + idx + '" value="' + escHtml(r[0] || "") + '">' +
+              '<input class="budget-input budget-input--amount" style="width:80px;" ' +
+                'id="extra-amt-' + m.id + '-' + idx + '" type="number" value="' + Math.abs(r[1] || 0) + '">' +
+              '<button class="budget-save" data-save-extra="' + m.id + '">✓</button>' +
+              '<button style="background:transparent;border:none;color:var(--cr);cursor:pointer;font-size:.7rem;" ' +
+                'data-del-extra="' + m.id + '" data-idx="' + idx + '">✕</button>' +
+            '</div>';
+          }).join("") +
+        '</div>' +
+      '</div>';
+    }
 
     html +=
       '<textarea class="month-note-input" data-month="' + m.id + '" maxlength="300" placeholder="Notas del mes (máx. 300 caracteres)...">' + escHtml(savedNote) + '</textarea>' +
@@ -1151,6 +1207,73 @@ function bindAllEvents() {
   // ── Refrescar historial
   var btnHist = document.getElementById("btn-refresh-history");
   if (btnHist) btnHist.addEventListener("click", loadHistory);
+
+  // ── Extra expenses: agregar fila
+  document.addEventListener("click", function (e) {
+    var monthId = e.target.dataset.monthExtra;
+    if (!monthId) return;
+    var m = MONTHS_DEF.find(function (x) { return x.id === monthId; });
+    if (!m) return;
+    m.extraExpenses = m.extraExpenses || [];
+    m.extraExpenses.push(["Nuevo pago", 0]);
+    renderMonthlyPlan();
+    drawWaterfall();
+    renderBudget();
+  });
+
+  // ── Extra expenses: guardar fila
+  document.addEventListener("click", function (e) {
+    var monthId = e.target.dataset.saveExtra;
+    if (!monthId) return;
+    saveExtraExpenses(monthId);
+  });
+
+  // ── Extra expenses: eliminar fila
+  document.addEventListener("click", function (e) {
+    var monthId = e.target.dataset.delExtra;
+    if (!monthId) return;
+    var idx = parseInt(e.target.dataset.idx);
+    var m   = MONTHS_DEF.find(function (x) { return x.id === monthId; });
+    if (!m) return;
+    m.extraExpenses.splice(idx, 1);
+    saveExtraExpenses(monthId);
+  });
+}
+
+async function saveExtraExpenses(monthId) {
+  var m = MONTHS_DEF.find(function (x) { return x.id === monthId; });
+  if (!m) return;
+
+  // Leer valores actuales de los inputs del DOM
+  var container = document.getElementById("extra-items-" + monthId);
+  if (container) {
+    var rows = container.querySelectorAll(".extra-item-row");
+    var updated = [];
+    rows.forEach(function (row, idx) {
+      var lbl = row.querySelector('[id^="extra-label-"]');
+      var amt = row.querySelector('[id^="extra-amt-"]');
+      if (lbl && amt) {
+        var amount = parseFloat(amt.value) || 0;
+        updated.push([lbl.value || "Pago extra", -Math.abs(amount)]);
+      }
+    });
+    m.extraExpenses = updated;
+  }
+
+  // Persistir en cache local
+  var allExtra = MONTHS_DEF
+    .filter(function (x) { return x.extraExpenses && x.extraExpenses.length; })
+    .map(function (x) { return { monthId: x.id, items: x.extraExpenses }; });
+  persistUserConfigCache("extraExpenses", allExtra);
+
+  // Guardar en Sheets
+  await SHEETS.saveConfig("extraExpenses", JSON.stringify(allExtra), "Pagos extra " + monthId);
+  await saveAll("Pagos extra actualizados: " + monthId);
+
+  renderMonthlyPlan();
+  drawWaterfall();
+  renderBudget();
+  showToast("✓ Pagos extra guardados");
 }
 
 function closeDebtEdit(key) {
