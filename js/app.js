@@ -553,13 +553,17 @@ async function saveBudgetVariable(items) {
 }
 async function saveBudgetIncome(items) {
   items.forEach(function (i) {
-    if (i.id === "nomina") CONFIG.income.nomina = i.amount;
-    if (i.id === "vales")  CONFIG.income.vales  = i.amount;
-    if (i.id === "otros")  CONFIG.income.otros  = i.amount;
+    if (i.id === "nomina") {
+      // Actualiza ambas nóminas para que sea consistente en cualquier mes
+      CONFIG.income.nomina            = i.amount;
+      CONFIG.income.nominaPreOffcycle = i.amount;
+    }
+    if (i.id === "vales") CONFIG.income.vales = i.amount;
+    if (i.id === "otros") CONFIG.income.otros = i.amount;
   });
   await SHEETS.saveConfig("income", JSON.stringify(CONFIG.income), "Ingresos actualizados");
   await saveAll("Ingresos actualizados");
-  renderBudget(); renderCounters();
+  renderBudget(); renderCounters(); renderMonthlyPlan();
 }
 
 // ============================================================
@@ -804,8 +808,9 @@ function normalizeDate(d) {
 // Incluye alta+media prob — baja se omite del cashflow
 function eiForMonth(ym) {
   return EI.items.filter(function (i) {
-    var d = normalizeDate(i.date);
-    return d && d.substring(0, 7) === ym && i.prob !== "baja";
+    var d    = normalizeDate(i.date);
+    var prob = (i.prob || "").toLowerCase().trim();
+    return d && d.substring(0, 7) === ym && prob !== "baja";
   });
 }
 
