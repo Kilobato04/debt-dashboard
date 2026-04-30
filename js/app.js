@@ -55,7 +55,7 @@ var MONTHS_DEF = [
   },
   {
     id: "jul", label: "Julio", emoji: "🟢", status: "good", ym: "2026-07",
-    extraExpenses: [["Cuota Banamex (ajuste)", -5500]],
+    extraExpenses: [],
     balances: { banorte: 15000, banamexNomina: 188000 }
   },
   {
@@ -139,18 +139,33 @@ function buildProjection() {
   var deuda  = CALC.totalDebt();
   var puntos = [];
 
+  // Eventos especiales por mes que no se derivan de surplus ni EI
+  // El pivote de Jun: Banamex redispone $180k → SPEI → Banorte
+  // El net effect es una reducción adicional en la deuda total de Banorte
+  // equivalente al creditLimit de banamexNomina usado para pagar.
+  var specialEvents = {
+    "2026-06": CONFIG.debts.banamexNomina.creditLimit || 180000
+  };
+
   meses.forEach(function (ym, i) {
     puntos.push({ m: labels[i], ym: ym, debtStart: Math.max(0, Math.round(deuda)) });
     if (i < meses.length - 1) {
+      // 1. Surplus mensual (nómina - gastos - mínimos)
       var surplus = CALC.surplusForDebt(ym);
-      var eiMes   = EI.items
+
+      // 2. EI alta prob del mes
+      var eiMes = EI.items
         .filter(function (it) {
           var d    = normalizeDate(it.date);
           var prob = (it.prob || "").toLowerCase().trim();
           return d && d.substring(0,7) === ym && prob === "alta" && it.status === "pendiente";
         })
         .reduce(function (s, it) { return s + (parseFloat(it.amount)||0); }, 0);
-      deuda = Math.max(0, deuda - surplus - eiMes);
+
+      // 3. Eventos especiales del mes (ej. pivote Jun)
+      var special = specialEvents[ym] || 0;
+
+      deuda = Math.max(0, deuda - surplus - eiMes - special);
     }
   });
 
