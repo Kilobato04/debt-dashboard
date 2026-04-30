@@ -120,22 +120,29 @@ var SHEETS = {
     });
   },
 
-  // ── POST no-cors (fire-and-forget) ────────────────────
+  // ── POST via Netlify Function proxy ──────────────────
+  // El browser no puede hacer POST directo a GAS (CORS + redirect).
+  // /api/sheets-proxy reenvía server-side sin restricciones.
   _post: async function (payload) {
     try {
-      await fetch(CONFIG.sheetApiBase, {
+      var response = await fetch("/api/sheets-proxy", {
         method:  "POST",
-        mode:    "no-cors",
-        headers: { "Content-Type": "text/plain" },
+        headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload)
       });
-      this._connected = true;
+
+      var result = await response.json();
+      var ok = response.ok && result.success !== false;
+      this._connected = ok;
       updateConnectionDot();
-      return { success: true };
+
+      if (!ok) console.warn("Proxy error:", result.error || response.status);
+      return ok ? { success: true } : { success: false, error: result.error };
+
     } catch (err) {
       this._connected = false;
       updateConnectionDot();
-      console.warn("Sheets offline:", err.message);
+      console.warn("Sheets proxy offline:", err.message);
       return { success: false, error: err.message };
     }
   }
