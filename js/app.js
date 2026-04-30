@@ -768,15 +768,35 @@ async function deleteEI(id) {
 // ── HELPER: normaliza fecha a string YYYY-MM-DD ───────────
 function normalizeDate(d) {
   if (!d) return "";
-  // Si viene como Date object de Google Sheets (serializado como number o Date)
+
+  // Date object JS nativo
   if (d instanceof Date) return d.toISOString().substring(0, 10);
+
   var s = String(d).trim();
-  // Si viene como timestamp numérico
-  if (/^\d{10,}$/.test(s)) return new Date(parseInt(s)).toISOString().substring(0, 10);
-  // Si viene como "DD/MM/YYYY" (formato Sheets en es-MX)
+  if (!s || s === "0") return "";
+
+  // Número puro — puede ser serial Sheets o timestamp Unix
+  if (/^\d+$/.test(s)) {
+    var n = parseInt(s);
+    // Serial Google Sheets: días desde 30-Dic-1899 (rango 2009-2036 ≈ 40000-55000)
+    if (n > 39999 && n < 55000) {
+      var epoch = new Date(1899, 11, 30);
+      epoch.setDate(epoch.getDate() + n);
+      return epoch.toISOString().substring(0, 10);
+    }
+    // Timestamp Unix ms (13 dígitos)
+    if (n > 1e12) return new Date(n).toISOString().substring(0, 10);
+  }
+
+  // "DD/MM/YYYY" — locale es-MX de Sheets
   var mxMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mxMatch) return mxMatch[3] + "-" + mxMatch[2].padStart(2,"0") + "-" + mxMatch[1].padStart(2,"0");
-  // Si ya es YYYY-MM-DD o YYYY-MM-DDThh:mm:ss
+
+  // Cualquier formato parseable por JS ("Apr 24 2026", "April 24, 2026", etc.)
+  var parsed = Date.parse(s);
+  if (!isNaN(parsed)) return new Date(parsed).toISOString().substring(0, 10);
+
+  // Ya es YYYY-MM-DD
   return s.substring(0, 10);
 }
 
