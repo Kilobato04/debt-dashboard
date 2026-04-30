@@ -118,9 +118,10 @@ function renderAll() {
   renderBudget();
   renderSubscriptions();
   renderExtraordinaryIncome();
-  renderMonthlyPlan();
+  buildProjection();      // 1. inicializa WF_PROJECTION con deuda actual
+  renderMonthlyPlan();    // 2. llena WF_PROJECTION con saldos reales mes a mes
+  drawWaterfall();        // 3. dibuja con los saldos ya calculados
   renderTimeline();
-  drawWaterfall();        // recalcula proyección con datos actuales
   loadHistory();
   updateTimestamp();
 }
@@ -134,43 +135,15 @@ function renderAll() {
 var WF_PROJECTION = [];
 
 function buildProjection() {
+  // Inicializa WF_PROJECTION con el saldo actual como punto de partida.
+  // renderMonthlyPlan() lo sobrescribirá mes a mes con los saldos reales
+  // calculados desde el cashflow — esa es la fuente de verdad.
   var meses  = ["2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10"];
   var labels = ["ABR","MAY","JUN","JUL","AGO","SEP","OCT"];
-  var deuda  = CALC.totalDebt();
-  var puntos = [];
-
-  // Eventos especiales por mes que no se derivan de surplus ni EI
-  // El pivote de Jun: Banamex redispone $180k → SPEI → Banorte
-  // El net effect es una reducción adicional en la deuda total de Banorte
-  // equivalente al creditLimit de banamexNomina usado para pagar.
-  var specialEvents = {
-    "2026-06": CONFIG.debts.banamexNomina.creditLimit || 180000
-  };
-
-  meses.forEach(function (ym, i) {
-    puntos.push({ m: labels[i], ym: ym, debtStart: Math.max(0, Math.round(deuda)) });
-    if (i < meses.length - 1) {
-      // 1. Surplus mensual (nómina - gastos - mínimos)
-      var surplus = CALC.surplusForDebt(ym);
-
-      // 2. EI alta prob del mes
-      var eiMes = EI.items
-        .filter(function (it) {
-          var d    = normalizeDate(it.date);
-          var prob = (it.prob || "").toLowerCase().trim();
-          return d && d.substring(0,7) === ym && prob === "alta" && it.status === "pendiente";
-        })
-        .reduce(function (s, it) { return s + (parseFloat(it.amount)||0); }, 0);
-
-      // 3. Eventos especiales del mes (ej. pivote Jun)
-      var special = specialEvents[ym] || 0;
-
-      deuda = Math.max(0, deuda - surplus - eiMes - special);
-    }
+  WF_PROJECTION = meses.map(function (ym, i) {
+    return { m: labels[i], ym: ym, debtStart: CALC.totalDebt(), debtEnd: CALC.totalDebt() };
   });
-
-  WF_PROJECTION = puntos;
-  return puntos;
+  return WF_PROJECTION;
 }
 
 // Deuda proyectada al inicio de un mes (ym = "2026-04" etc.)
@@ -183,22 +156,27 @@ function drawWaterfall() {
   var c = document.getElementById("wf-chart");
   if (!c) return;
 
-  var puntos  = buildProjection();
+  // WF_PROJECTION ya fue llenado por renderMonthlyPlan con los saldos reales.
+  // Si aún no se renderizó el plan (primera carga), usar buildProjection como fallback.
+  if (!WF_PROJECTION.length) buildProjection();
+
+  // Usar debtStart de cada mes (saldo al inicio = cierre del mes anterior)
+  // El primer mes usa la deuda actual real.
+  var puntos  = WF_PROJECTION;
   var maxDebt = puntos[0].debtStart || CONFIG.debtBaseline || 443499;
   var H = 80;
   c.innerHTML = "";
 
   puntos.forEach(function (d) {
-    var barH = d.debtStart === 0
-      ? 4 : Math.max(4, Math.round((d.debtStart / maxDebt) * H));
-    var cls = d.debtStart === 0
-      ? "wf-bar--zero"
-      : d.debtStart > maxDebt * 0.6 ? "wf-bar--high"
-      : d.debtStart > maxDebt * 0.3 ? "wf-bar--mid"
-      : "wf-bar--low";
-    var valTxt = d.debtStart === 0 ? "$0"
-      : d.debtStart >= 1000 ? "$" + Math.round(d.debtStart/1000) + "k"
-      : "$" + d.debtStart;
+    var val     = d.debtStart;
+    var barH    = val === 0 ? 4 : Math.max(4, Math.round((val / maxDebt) * H));
+    var cls     = val === 0          ? "wf-bar--zero"
+                : val > maxDebt * 0.6 ? "wf-bar--high"
+                : val > maxDebt * 0.3 ? "wf-bar--mid"
+                : "wf-bar--low";
+    var valTxt  = val === 0 ? "$0"
+                : val >= 1000 ? "$" + Math.round(val/1000) + "k"
+                : "$" + val;
 
     var wrap = document.createElement("div");
     wrap.className = "wf-bar-wrap";
@@ -1001,10 +979,33 @@ function renderMonthlyPlan() {
       });
       html += '</div>';
 
-      // ── Surplus ───────────────────────────────────────────
+      // ── Surplus y saldo cierre ────────────────────────────
+      // deudaInicio viene del punto anterior en WF_PROJECTION
+      var wfPunto   = WF_PROJECTION.find(function (p) { return p.ym === m.ym; });
+      var deudaIni  = wfPunto ? wfPunto.debtStart : CALC.totalDebt();
+      var deudaCierre = Math.max(0, deudaIni - Math.max(0, surplus));
+
+      // Actualizar WF_PROJECTION con el saldo real de cierre
+      if (wfPunto) wfPunto.debtEnd = deudaCierre;
+      // El siguiente mes arranca con el saldo de cierre de este mes
+      var nextPunto = WF_PROJECTION.find(function (p) {
+        return p.ym > m.ym && (!WF_PROJECTION.find(function(q){ return q.ym > m.ym && q.ym < p.ym; }));
+      });
+      if (nextPunto) nextPunto.debtStart = deudaCierre;
+
       html += '<div class="month-block__surplus">' +
         '<span>Excedente para deuda</span>' +
         '<span style="color:' + (surplus >= 0 ? 'var(--cp)' : 'var(--cr)') + '">' + fmt(surplus) + '</span>' +
+      '</div>';
+
+      // ── Saldo deuda al cierre del mes ─────────────────────
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;' +
+        'padding:.25rem .4rem;background:rgba(26,32,8,.25);border-radius:3px;margin-top:.2rem;">' +
+        '<span style="font-size:.55rem;color:var(--sd);">Saldo deuda al cierre</span>' +
+        '<span style="font-family:var(--lcd);font-size:.95rem;color:' +
+          (deudaCierre > 0 ? 'var(--cy)' : 'var(--cg)') + '">' +
+          fmt(deudaCierre) +
+        '</span>' +
       '</div>';
     }
 
