@@ -37,41 +37,13 @@ var MONTH_NOTES = {};
 //   Estos son los únicos valores "especiales por mes" que no se pueden derivar de CALC
 // · EI: inyectados dinámicamente desde EI.items via eiForMonth()
 var MONTHS_DEF = [
-  {
-    id: "apr", label: "Abril", emoji: "🔴", status: "urgent", ym: "2026-04",
-    extraExpenses: [["TDC Banamex (corte)", -14892]],  // corte especial de abril
-    balances: { banorte: 250676, banamexNomina: 152000 }
-  },
-  {
-    id: "may", label: "Mayo", emoji: "🟣", status: "key", ym: "2026-05",
-    extraExpenses: [],
-    balances: { banorte: 250676, banamexNomina: 69000 }
-  },
-  {
-    id: "jun", label: "Junio", emoji: "🔄", status: "pivot", ym: "2026-06",
-    extraExpenses: [],
-    balances: { banorte: 70000, banamexNomina: 180000 },
-    pivote: true
-  },
-  {
-    id: "jul", label: "Julio", emoji: "🟢", status: "good", ym: "2026-07",
-    extraExpenses: [],
-    balances: { banorte: 15000, banamexNomina: 188000 }
-  },
-  {
-    id: "aug", label: "Agosto", emoji: "🟢", status: "good", ym: "2026-08",
-    extraExpenses: [["Cerrar Banorte", -15000]],
-    balances: { banorte: 0, banamexNomina: 118000 }
-  },
-  {
-    id: "sep", label: "Septiembre", emoji: "🟢", status: "good", ym: "2026-09",
-    extraExpenses: [],
-    balances: { banorte: 0, banamexNomina: 38000 }
-  },
-  {
-    id: "oct", label: "1-Oct · META 🏁", emoji: "🏁", status: "win", ym: "2026-10",
-    balances: { banorte: 0, banamexNomina: 0 }
-  }
+  { id:"apr", label:"Abril",          emoji:"🔴", status:"urgent", ym:"2026-04", extraExpenses:[], minOverrides:{}, balances:{banorte:250676,banamexNomina:152000} },
+  { id:"may", label:"Mayo",           emoji:"🟣", status:"key",    ym:"2026-05", extraExpenses:[], minOverrides:{}, balances:{banorte:250676,banamexNomina:69000}  },
+  { id:"jun", label:"Junio",          emoji:"🔄", status:"pivot",  ym:"2026-06", extraExpenses:[], minOverrides:{}, balances:{banorte:70000, banamexNomina:180000}, pivote:true },
+  { id:"jul", label:"Julio",          emoji:"🟢", status:"good",   ym:"2026-07", extraExpenses:[], minOverrides:{}, balances:{banorte:15000, banamexNomina:188000} },
+  { id:"aug", label:"Agosto",         emoji:"🟢", status:"good",   ym:"2026-08", extraExpenses:[], minOverrides:{}, balances:{banorte:0,     banamexNomina:118000} },
+  { id:"sep", label:"Septiembre",     emoji:"🟢", status:"good",   ym:"2026-09", extraExpenses:[], minOverrides:{}, balances:{banorte:0,     banamexNomina:38000}  },
+  { id:"oct", label:"1-Oct · META 🏁",emoji:"🏁", status:"win",   ym:"2026-10", extraExpenses:[], minOverrides:{}, balances:{banorte:0,     banamexNomina:0}      }
 ];
 
 // ============================================================
@@ -325,10 +297,16 @@ function applyUserConfig(cfg) {
     if (cfg.subscriptions)    CONFIG.subscriptions    = cfg.subscriptions;
     if (cfg.income)           Object.assign(CONFIG.income, cfg.income);
     if (cfg.extraExpenses) {
-      // Sobreescribir extraExpenses de cada mes desde Sheets
       cfg.extraExpenses.forEach(function (row) {
         var m = MONTHS_DEF.find(function (x) { return x.id === row.monthId; });
         if (m) m.extraExpenses = row.items || [];
+      });
+    }
+    if (cfg.minOverrides) {
+      // Cargar mínimos editados por mes
+      cfg.minOverrides.forEach(function (row) {
+        var m = MONTHS_DEF.find(function (x) { return x.id === row.monthId; });
+        if (m) m.minOverrides = row.overrides || {};
       });
     }
     if (cfg.debtMeta) {
@@ -916,12 +894,12 @@ function renderMonthlyPlan() {
     var eiItems   = m.ym ? eiForMonth(m.ym) : [];
     var eiTotal   = eiItems.reduce(function (s, i) { return s + (parseFloat(i.amount) || 0); }, 0);
 
-    // ── Salidas desde CALC + mínimos reales + extras del mes ─
+    // ── Salidas desde CALC + mínimos del mes + extras ────────
     var fixed     = CALC.totalFixed();
     var variable  = CALC.totalVariable();
-    var mins      = CALC.totalMinPayments();
+    var mins      = CALC.totalMinPaymentsForMonth(m.id);  // usa override si existe
     var extraExp  = (m.extraExpenses || []).reduce(function (s, r) { return s + (r[1] || 0); }, 0);
-    var totalOut  = fixed + variable + mins + extraExp;  // todo negativo
+    var totalOut  = fixed + variable + mins + extraExp;
 
     // ── Surplus real ─────────────────────────────────────────
     var surplus   = nomina + eiTotal - totalOut;
@@ -967,13 +945,45 @@ function renderMonthlyPlan() {
 
       html += '</div>';
 
+      // ── Mínimos del mes — usa override si existe, si no minPayment de CONFIG ──────
+      var minsDelMes = CALC.totalMinPaymentsForMonth(m.id);
+
       // ── Panel salidas ─────────────────────────────────────
       html += '<div class="month-block__section"><div class="month-section-title">↓ Salidas</div>';
       html += '<div class="month-row"><span>Gastos fijos vida</span><span class="text-red">-' + fmt(fixed) + '</span></div>';
       html += '<div class="month-row"><span>Gastos variables</span><span class="text-red">-' + fmt(variable) + '</span></div>';
-      html += '<div class="month-row"><span>Mínimos deuda</span><span class="text-red">-' + fmt(mins) + '</span></div>';
 
-      // Pagos extra específicos del mes (ej. corte especial, cierre Banorte)
+      // Mínimos por deuda — editable inline si tiene override
+      html += '<div class="month-row" style="align-items:flex-start;flex-direction:column;gap:.15rem;">';
+      html += '<div style="display:flex;justify-content:space-between;width:100%;">';
+      html += '<span>Mínimos deuda</span><span class="text-red">-' + fmt(minsDelMes) + '</span></div>';
+
+      // Detalle editable de mínimos por deuda (Opción C)
+      html += '<div class="month-mins-detail" id="mins-detail-' + m.id + '" style="width:100%;margin-top:.2rem;">';
+      Object.keys(CONFIG.debts).forEach(function (k) {
+        var d        = CONFIG.debts[k];
+        var override = m.minOverrides && m.minOverrides[k] != null ? m.minOverrides[k] : "";
+        var est      = CALC.estimatedMin(k);
+        var placeholder = "Est. " + fmt(est);
+        html +=
+          '<div style="display:flex;align-items:center;gap:.3rem;padding:.1rem 0;">' +
+            '<span style="font-size:.52rem;color:var(--sd);flex:1;">' + d.label + '</span>' +
+            '<input class="budget-input budget-input--amount" ' +
+              'style="width:80px;font-size:.72rem;" ' +
+              'id="min-override-' + m.id + '-' + k + '" ' +
+              'type="number" min="0" ' +
+              'placeholder="' + fmt(est) + '" ' +
+              'value="' + (override !== "" ? override : "") + '">' +
+          '</div>';
+      });
+      html += '</div>'; // month-mins-detail
+
+      html += '<div style="display:flex;justify-content:flex-end;margin-top:.15rem;">';
+      html += '<button class="month-note-save" data-save-mins="' + m.id + '" style="font-size:.48rem;">Guardar mínimos</button>';
+      html += '</div>';
+      html += '</div>'; // month-row mínimos
+
+      // Pagos extra específicos del mes
       (m.extraExpenses || []).forEach(function (r) {
         html += '<div class="month-row"><span>' + r[0] + '</span><span class="text-red">' + fmt(r[1]) + '</span></div>';
       });
@@ -1372,6 +1382,13 @@ function bindAllEvents() {
   var btnHist = document.getElementById("btn-refresh-history");
   if (btnHist) btnHist.addEventListener("click", loadHistory);
 
+  // ── Guardar mínimos por mes
+  document.addEventListener("click", function (e) {
+    var monthId = e.target.dataset.saveMins;
+    if (!monthId) return;
+    saveMonthMins(monthId);
+  });
+
   // ── Extra expenses: agregar fila
   document.addEventListener("click", function (e) {
     var monthId = e.target.dataset.monthExtra;
@@ -1402,6 +1419,39 @@ function bindAllEvents() {
     m.extraExpenses.splice(idx, 1);
     saveExtraExpenses(monthId, true);  // true = skip DOM flush, ya hicimos splice
   });
+}
+
+// Guarda los mínimos editados por mes
+async function saveMonthMins(monthId) {
+  var m = MONTHS_DEF.find(function (x) { return x.id === monthId; });
+  if (!m) return;
+  m.minOverrides = m.minOverrides || {};
+
+  // Leer inputs del DOM
+  Object.keys(CONFIG.debts).forEach(function (k) {
+    var el = document.getElementById("min-override-" + monthId + "-" + k);
+    if (!el) return;
+    var v = el.value.trim();
+    if (v !== "" && !isNaN(parseFloat(v))) {
+      m.minOverrides[k] = parseFloat(v);
+    } else {
+      delete m.minOverrides[k];  // sin override → usar minPayment de CONFIG
+    }
+  });
+
+  // Persistir
+  var allOverrides = MONTHS_DEF
+    .filter(function (x) { return x.minOverrides && Object.keys(x.minOverrides).length; })
+    .map(function (x) { return { monthId: x.id, overrides: x.minOverrides }; });
+
+  persistUserConfigCache("minOverrides", allOverrides);
+  await SHEETS.saveConfig("minOverrides", JSON.stringify(allOverrides), "Mínimos mes " + monthId);
+  await saveAll("Mínimos actualizados: " + monthId);
+  renderMonthlyPlan();
+  drawWaterfall();
+  renderBudget();
+  renderCounters();
+  showToast("✓ Mínimos de " + monthId + " guardados");
 }
 
 // Flush DOM → CONFIG antes de persistir (solo cuando no es delete)
