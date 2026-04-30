@@ -649,20 +649,40 @@ function renderSubscriptions() {
       '<td><input class="budget-input budget-input--label" data-id="' + s.id + '" value="' + escHtml(s.label || "") + '"></td>' +
       '<td><input class="budget-input budget-input--amount" data-id="' + s.id + '" data-field="abr" type="number" min="0" value="' + (s.abr || 0) + '"></td>' +
       '<td><input class="budget-input budget-input--amount" data-id="' + s.id + '" data-field="current" type="number" min="0" value="' + (s.current || 0) + '"></td>' +
-      '<td><button class="budget-save" data-id="' + s.id + '">✓</button></td>';
+      '<td style="display:flex;gap:.2rem;">' +
+        '<button class="budget-save" data-sub-save="' + s.id + '">✓</button>' +
+        '<button style="background:transparent;border:none;color:var(--cr);cursor:pointer;font-size:.7rem;padding:.15rem .3rem;" data-sub-del="' + s.id + '">✕</button>' +
+      '</td>';
     tb.appendChild(tr);
-    tr.querySelector(".budget-save").addEventListener("click", function () {
-      var idx = CONFIG.subscriptions.findIndex(function (i) { return i.id === s.id; });
-      if (idx > -1) {
-        var lbl = tr.querySelector('[data-id="' + s.id + '"]:not([data-field])');
-        var aEl = tr.querySelector('[data-field="abr"]');
-        var cEl = tr.querySelector('[data-field="current"]');
+  });
+
+  // Event delegation — sobrevive re-renders
+  var fresh = tb.cloneNode(true);
+  tb.parentNode.replaceChild(fresh, tb);
+
+  fresh.addEventListener("click", function (e) {
+    // ── Guardar fila individual ──
+    var saveId = e.target.dataset.subSave;
+    if (saveId) {
+      var row = e.target.closest("tr");
+      var idx = CONFIG.subscriptions.findIndex(function (i) { return i.id === saveId; });
+      if (idx > -1 && row) {
+        var lbl = row.querySelector('[data-id="' + saveId + '"]:not([data-field])');
+        var aEl = row.querySelector('[data-field="abr"]');
+        var cEl = row.querySelector('[data-field="current"]');
         if (lbl) CONFIG.subscriptions[idx].label   = lbl.value;
         if (aEl) CONFIG.subscriptions[idx].abr     = parseFloat(aEl.value) || 0;
         if (cEl) CONFIG.subscriptions[idx].current = parseFloat(cEl.value) || 0;
       }
       saveSubs();
-    });
+    }
+    // ── Eliminar fila ──
+    var delId = e.target.dataset.subDel;
+    if (delId) {
+      if (!confirm("¿Eliminar esta suscripción?")) return;
+      CONFIG.subscriptions = CONFIG.subscriptions.filter(function (i) { return i.id !== delId; });
+      saveSubs();
+    }
   });
 
   if (tf) tf.innerHTML =
@@ -673,6 +693,7 @@ function renderSubscriptions() {
 }
 
 async function saveSubs() {
+  persistUserConfigCache("subscriptions", CONFIG.subscriptions);
   await SHEETS.saveConfig("subscriptions", JSON.stringify(CONFIG.subscriptions), "Suscripciones actualizadas");
   await saveAll("Suscripciones actualizadas");
   renderSubscriptions();
@@ -1205,6 +1226,33 @@ async function flushBudgetInputs() {
     persistUserConfigCache("variableExpenses", CONFIG.variableExpenses);
     await SHEETS.saveConfig("variableExpenses", JSON.stringify(CONFIG.variableExpenses), "Auto-flush gastos variables");
   }
+
+  // ── Suscripciones ─────────────────────────────────────────
+  var subsChanged = false;
+  document.querySelectorAll("#subs-tbody tr").forEach(function (tr) {
+    var lbl = tr.querySelector(".budget-input--label");
+    var aEl = tr.querySelector("[data-field='abr']");
+    var cEl = tr.querySelector("[data-field='current']");
+    if (!lbl && !aEl) return;
+    var id  = (lbl || aEl).dataset.id;
+    var idx = CONFIG.subscriptions.findIndex(function (i) { return i.id === id; });
+    if (idx === -1) return;
+    var newLbl = lbl ? lbl.value : CONFIG.subscriptions[idx].label;
+    var newAbr = aEl ? parseFloat(aEl.value) || 0 : CONFIG.subscriptions[idx].abr;
+    var newCur = cEl ? parseFloat(cEl.value) || 0 : CONFIG.subscriptions[idx].current;
+    if (newLbl !== CONFIG.subscriptions[idx].label ||
+        newAbr !== CONFIG.subscriptions[idx].abr   ||
+        newCur !== CONFIG.subscriptions[idx].current) {
+      CONFIG.subscriptions[idx].label   = newLbl;
+      CONFIG.subscriptions[idx].abr     = newAbr;
+      CONFIG.subscriptions[idx].current = newCur;
+      subsChanged = true;
+    }
+  });
+  if (subsChanged) {
+    persistUserConfigCache("subscriptions", CONFIG.subscriptions);
+    await SHEETS.saveConfig("subscriptions", JSON.stringify(CONFIG.subscriptions), "Auto-flush suscripciones");
+  }
 }
 
 async function persistAndRender(notes) {
@@ -1329,40 +1377,38 @@ function bindAllEvents() {
     var m   = MONTHS_DEF.find(function (x) { return x.id === monthId; });
     if (!m) return;
     m.extraExpenses.splice(idx, 1);
-    saveExtraExpenses(monthId);
+    saveExtraExpenses(monthId, true);  // true = skip DOM flush, ya hicimos splice
   });
 }
 
-async function saveExtraExpenses(monthId) {
+// Flush DOM → CONFIG antes de persistir (solo cuando no es delete)
+function flushExtraFromDOM(monthId) {
+  var m = MONTHS_DEF.find(function (x) { return x.id === monthId; });
+  if (!m) return;
+  var container = document.getElementById("extra-items-" + monthId);
+  if (!container) return;
+  var updated = [];
+  container.querySelectorAll(".extra-item-row").forEach(function (row) {
+    var lbl = row.querySelector('[id^="extra-label-"]');
+    var amt = row.querySelector('[id^="extra-amt-"]');
+    if (lbl && amt) updated.push([lbl.value || "Pago extra", -Math.abs(parseFloat(amt.value) || 0)]);
+  });
+  m.extraExpenses = updated;
+}
+
+async function saveExtraExpenses(monthId, skipDOMFlush) {
   var m = MONTHS_DEF.find(function (x) { return x.id === monthId; });
   if (!m) return;
 
-  // Leer valores actuales de los inputs del DOM
-  var container = document.getElementById("extra-items-" + monthId);
-  if (container) {
-    var rows = container.querySelectorAll(".extra-item-row");
-    var updated = [];
-    rows.forEach(function (row, idx) {
-      var lbl = row.querySelector('[id^="extra-label-"]');
-      var amt = row.querySelector('[id^="extra-amt-"]');
-      if (lbl && amt) {
-        var amount = parseFloat(amt.value) || 0;
-        updated.push([lbl.value || "Pago extra", -Math.abs(amount)]);
-      }
-    });
-    m.extraExpenses = updated;
-  }
+  // Solo leer DOM si no venimos de un delete (en delete ya hicimos splice antes)
+  if (!skipDOMFlush) flushExtraFromDOM(monthId);
 
-  // Persistir en cache local
   var allExtra = MONTHS_DEF
     .filter(function (x) { return x.extraExpenses && x.extraExpenses.length; })
     .map(function (x) { return { monthId: x.id, items: x.extraExpenses }; });
   persistUserConfigCache("extraExpenses", allExtra);
-
-  // Guardar en Sheets
   await SHEETS.saveConfig("extraExpenses", JSON.stringify(allExtra), "Pagos extra " + monthId);
   await saveAll("Pagos extra actualizados: " + monthId);
-
   renderMonthlyPlan();
   drawWaterfall();
   renderBudget();
