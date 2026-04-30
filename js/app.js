@@ -560,6 +560,7 @@ function renderBudgetTable(tbodyId, items, saveCallback) {
   var tb = document.getElementById(tbodyId);
   if (!tb) return;
   tb.innerHTML = "";
+
   items.forEach(function (item) {
     var tr = document.createElement("tr");
     tr.innerHTML =
@@ -567,16 +568,25 @@ function renderBudgetTable(tbodyId, items, saveCallback) {
       '<td><input class="budget-input budget-input--amount" data-id="' + item.id + '" data-field="amount" type="number" min="0" value="' + (item.amount || 0) + '"></td>' +
       '<td><button class="budget-save" data-id="' + item.id + '">✓</button></td>';
     tb.appendChild(tr);
-    tr.querySelector(".budget-save").addEventListener("click", function () {
-      var lEl = tr.querySelector('[data-field="label"]');
-      var aEl = tr.querySelector('[data-field="amount"]');
-      var idx = items.findIndex(function (i) { return i.id === item.id; });
-      if (idx > -1) {
-        if (lEl) items[idx].label  = lEl.value;
-        if (aEl) items[idx].amount = parseFloat(aEl.value) || 0;
-      }
-      saveCallback(items);
-    });
+  });
+
+  // Event delegation — un solo listener en el tbody, sobrevive re-renders parciales
+  // Clonar el nodo elimina listeners anteriores antes de agregar el nuevo
+  var fresh = tb.cloneNode(true);
+  tb.parentNode.replaceChild(fresh, tb);
+  fresh.addEventListener("click", function (e) {
+    var btn = e.target.closest(".budget-save");
+    if (!btn) return;
+    var itemId = btn.dataset.id;
+    var row    = btn.closest("tr");
+    var lEl    = row.querySelector('[data-field="label"]');
+    var aEl    = row.querySelector('[data-field="amount"]');
+    var idx    = items.findIndex(function (i) { return i.id === itemId; });
+    if (idx > -1) {
+      if (lEl) items[idx].label  = lEl.value;
+      if (aEl) items[idx].amount = parseFloat(aEl.value) || 0;
+    }
+    saveCallback(items);
   });
 }
 
@@ -1117,7 +1127,90 @@ function chk(id) { var el = document.getElementById(id); return el && el.checked
 // ============================================================
 // PERSIST & RENDER
 // ============================================================
+
+// Lee todos los inputs del budget visibles en el DOM y los persiste
+// en CONFIG + Sheets. Así SAVE siempre captura lo que el usuario
+// escribió, aunque no haya presionado ✓ en cada fila.
+async function flushBudgetInputs() {
+  var changed = false;
+
+  // ── Ingresos ──────────────────────────────────────────────
+  var incomeMap = { nomina: null, vales: null, otros: null };
+  document.querySelectorAll("#income-body [data-field='amount']").forEach(function (el) {
+    var id  = el.dataset.id;
+    var val = parseFloat(el.value);
+    if (!isNaN(val) && incomeMap.hasOwnProperty(id)) incomeMap[id] = val;
+  });
+  document.querySelectorAll("#income-body [data-field='label']").forEach(function (el) {
+    // labels de ingresos no se sincronizan — solo amounts
+  });
+  if (incomeMap.nomina !== null && incomeMap.nomina !== CONFIG.income.nomina) {
+    CONFIG.income.nomina            = incomeMap.nomina;
+    CONFIG.income.nominaPreOffcycle = incomeMap.nomina;
+    changed = true;
+  }
+  if (incomeMap.vales !== null && incomeMap.vales !== CONFIG.income.vales) {
+    CONFIG.income.vales = incomeMap.vales; changed = true;
+  }
+  if (incomeMap.otros !== null && incomeMap.otros !== (CONFIG.income.otros || 0)) {
+    CONFIG.income.otros = incomeMap.otros; changed = true;
+  }
+  if (changed) {
+    persistUserConfigCache("income", CONFIG.income);
+    await SHEETS.saveConfig("income", JSON.stringify(CONFIG.income), "Auto-flush ingresos");
+  }
+
+  // ── Gastos fijos ──────────────────────────────────────────
+  var fixedChanged = false;
+  document.querySelectorAll("#fixed-expenses-body tr").forEach(function (tr) {
+    var idEl  = tr.querySelector("[data-id]");
+    var aEl   = tr.querySelector('[data-field="amount"]');
+    var lEl   = tr.querySelector('[data-field="label"]');
+    if (!idEl || !aEl) return;
+    var id  = idEl.dataset.id;
+    var idx = CONFIG.fixedExpenses.findIndex(function (i) { return i.id === id; });
+    if (idx === -1) return;
+    var newAmt = parseFloat(aEl.value) || 0;
+    var newLbl = lEl ? lEl.value : CONFIG.fixedExpenses[idx].label;
+    if (newAmt !== CONFIG.fixedExpenses[idx].amount || newLbl !== CONFIG.fixedExpenses[idx].label) {
+      CONFIG.fixedExpenses[idx].amount = newAmt;
+      CONFIG.fixedExpenses[idx].label  = newLbl;
+      fixedChanged = true;
+    }
+  });
+  if (fixedChanged) {
+    persistUserConfigCache("fixedExpenses", CONFIG.fixedExpenses);
+    await SHEETS.saveConfig("fixedExpenses", JSON.stringify(CONFIG.fixedExpenses), "Auto-flush gastos fijos");
+  }
+
+  // ── Gastos variables ──────────────────────────────────────
+  var varChanged = false;
+  document.querySelectorAll("#variable-expenses-body tr").forEach(function (tr) {
+    var idEl = tr.querySelector("[data-id]");
+    var aEl  = tr.querySelector('[data-field="amount"]');
+    var lEl  = tr.querySelector('[data-field="label"]');
+    if (!idEl || !aEl) return;
+    var id  = idEl.dataset.id;
+    var idx = CONFIG.variableExpenses.findIndex(function (i) { return i.id === id; });
+    if (idx === -1) return;
+    var newAmt = parseFloat(aEl.value) || 0;
+    var newLbl = lEl ? lEl.value : CONFIG.variableExpenses[idx].label;
+    if (newAmt !== CONFIG.variableExpenses[idx].amount || newLbl !== CONFIG.variableExpenses[idx].label) {
+      CONFIG.variableExpenses[idx].amount = newAmt;
+      CONFIG.variableExpenses[idx].label  = newLbl;
+      varChanged = true;
+    }
+  });
+  if (varChanged) {
+    persistUserConfigCache("variableExpenses", CONFIG.variableExpenses);
+    await SHEETS.saveConfig("variableExpenses", JSON.stringify(CONFIG.variableExpenses), "Auto-flush gastos variables");
+  }
+}
+
 async function persistAndRender(notes) {
+  // Primero capturar cualquier input del budget no guardado con ✓
+  await flushBudgetInputs();
+
   var state = {
     banorte:       CONFIG.debts.banorte.balance,
     banamexNomina: CONFIG.debts.banamexNomina.balance,
