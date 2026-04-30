@@ -144,7 +144,8 @@ function drawWaterfall() {
       var surplus = CALC.surplusForDebt(ym);
       var eiMes   = EI.items
         .filter(function (it) {
-          return it.date && it.date.substring(0,7) === ym
+          var d = normalizeDate(it.date);
+          return d && d.substring(0,7) === ym
             && it.prob === "alta" && it.status === "pendiente";
         })
         .reduce(function (s, it) { return s + (parseFloat(it.amount)||0); }, 0);
@@ -215,26 +216,39 @@ function applyDebtState(s) {
 
 async function loadExtraordinaryIncome() {
   try {
+    // Cargar cache local primero para render rápido
     var cached = sessionStorage.getItem("debt_ei");
-    if (cached) { EI.fromArray(JSON.parse(cached)); return; }
+    if (cached) EI.fromArray(JSON.parse(cached).map(function(i){
+      i.date = normalizeDate(i.date); return i;
+    }));
 
+    // Siempre refrescar desde Sheets (igual que loadDebtState)
     var r = await SHEETS.getHistory("extraordinary_income");
     if (r.success && r.data && r.data.length) {
-      EI.fromArray(r.data.map(function (row) {
+      var items = r.data.map(function (row) {
         return {
           id:     parseInt(row.id)     || 0,
           desc:   row.desc   || "",
           amount: parseFloat(row.amount) || 0,
-          date:   row.date   || "",
+          date:   normalizeDate(row.date),
           target: row.target || "libre",
           status: row.status || "pendiente",
           prob:   row.prob   || "alta",
           notes:  row.notes  || ""
         };
-      }));
-    } else {
-      // Defaults si Sheets está vacío
-      // REGLA: TODO ingreso extra vive aquí — el cashflow de cada mes lo lee dinámicamente
+      });
+      var changed = JSON.stringify(items) !== JSON.stringify(EI.items);
+      EI.fromArray(items);
+      sessionStorage.setItem("debt_ei", JSON.stringify(EI.items));
+      // Si Sheets trae datos distintos al cache, re-renderizar lo que depende de EI
+      if (changed) {
+        renderExtraordinaryIncome();
+        renderMonthlyPlan();
+        renderCounters();
+        drawWaterfall();
+      }
+    } else if (!cached) {
+      // Solo usar defaults si Sheets vacío Y sin cache
       EI.fromArray([
         // ── ABRIL ─────────────────────────────────────────────
         { id:1,  desc:"Hermana (1a quincena Abr)", amount:2500,  date:"2026-04-15", target:"libre",         status:"pendiente", prob:"alta",  notes:"Apoyo fijo mensual" },
@@ -243,7 +257,7 @@ async function loadExtraordinaryIncome() {
         { id:3,  desc:"PTU Arcadis",               amount:45000, date:"2026-05-30", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"Puede ser mayor" },
         // ── JUNIO ─────────────────────────────────────────────
         { id:4,  desc:"Smability (1a)",            amount:30000, date:"2026-06-15", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"" },
-        { id:5,  desc:"Apoyo pareja (Jun)",         amount:40000, date:"2026-06-30", target:"banorte",       status:"pendiente", prob:"media", notes:"Parte del apoyo total acordado" },
+        { id:5,  desc:"Apoyo pareja (Jun)",        amount:40000, date:"2026-06-30", target:"banorte",       status:"pendiente", prob:"media", notes:"Parte del apoyo total acordado" },
         // ── JULIO ─────────────────────────────────────────────
         { id:6,  desc:"Smability (2a)",            amount:20000, date:"2026-07-15", target:"banorte",       status:"pendiente", prob:"alta",  notes:"" },
         { id:7,  desc:"Airbnb Mundial",            amount:30000, date:"2026-07-01", target:"libre",         status:"pendiente", prob:"baja",  notes:"~20 noches. Decisión con pareja" },
@@ -252,8 +266,8 @@ async function loadExtraordinaryIncome() {
         // ── SEPTIEMBRE ────────────────────────────────────────
         { id:9,  desc:"Apoyo familiar",            amount:35000, date:"2026-09-30", target:"banamexNomina", status:"pendiente", prob:"alta",  notes:"" },
       ]);
+      sessionStorage.setItem("debt_ei", JSON.stringify(EI.items));
     }
-    sessionStorage.setItem("debt_ei", JSON.stringify(EI.items));
   } catch (e) { console.warn("loadEI:", e.message); }
 }
 
@@ -751,11 +765,27 @@ async function deleteEI(id) {
 
 // ============================================================
 // RENDER — MONTHLY PLAN (panel Meses)
+// ── HELPER: normaliza fecha a string YYYY-MM-DD ───────────
+function normalizeDate(d) {
+  if (!d) return "";
+  // Si viene como Date object de Google Sheets (serializado como number o Date)
+  if (d instanceof Date) return d.toISOString().substring(0, 10);
+  var s = String(d).trim();
+  // Si viene como timestamp numérico
+  if (/^\d{10,}$/.test(s)) return new Date(parseInt(s)).toISOString().substring(0, 10);
+  // Si viene como "DD/MM/YYYY" (formato Sheets en es-MX)
+  var mxMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mxMatch) return mxMatch[3] + "-" + mxMatch[2].padStart(2,"0") + "-" + mxMatch[1].padStart(2,"0");
+  // Si ya es YYYY-MM-DD o YYYY-MM-DDThh:mm:ss
+  return s.substring(0, 10);
+}
+
 // ── HELPER: EI del mes filtrado por ym ────────────────────
 // Incluye alta+media prob — baja se omite del cashflow
 function eiForMonth(ym) {
   return EI.items.filter(function (i) {
-    return i.date && i.date.substring(0, 7) === ym && i.prob !== "baja";
+    var d = normalizeDate(i.date);
+    return d && d.substring(0, 7) === ym && i.prob !== "baja";
   });
 }
 
