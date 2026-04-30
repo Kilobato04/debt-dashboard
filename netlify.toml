@@ -8,17 +8,16 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    # connect-src incluye 'self' para el proxy + GAS para JSONP GET
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com https://script.googleusercontent.com https://fonts.googleapis.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;"
 
-# Redirige /api/sheets-proxy → Netlify Function
+# Proxy a Netlify Function para escritura a GAS sin restricciones CORS
 [[redirects]]
   from = "/api/sheets-proxy"
   to   = "/.netlify/functions/sheets-proxy"
   status = 200
 
-# SPA fallback
-[[redirects]]
-  from = "/*"
-  to   = "/index.html"
-  status = 200
+# NOTA: El redirect SPA /* → /index.html está eliminado intencionalmente.
+# Este sitio NO es una SPA — index.html está en la raíz y los archivos
+# estáticos (js/, css/) deben servirse directamente.
+# El redirect SPA causaba que js/config.js, js/sheets.js y js/app.js
+# se sirvieran como index.html, rompiendo toda la carga de scripts.
