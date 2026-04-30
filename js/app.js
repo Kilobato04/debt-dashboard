@@ -340,7 +340,14 @@ function applyUserConfig(cfg) {
     }
     if (cfg.debtMeta) {
       Object.keys(cfg.debtMeta).forEach(function (k) {
-        if (CONFIG.debts[k]) Object.assign(CONFIG.debts[k], cfg.debtMeta[k]);
+        if (!CONFIG.debts[k]) return;
+        var meta = cfg.debtMeta[k];
+        // Solo sobreescribir minPayment si el valor de Sheets es > 0
+        // Evita que un minPayment guardado como 0/null borre el default real
+        if (meta.minPayment != null && parseFloat(meta.minPayment) > 0) {
+          CONFIG.debts[k].minPayment = parseFloat(meta.minPayment);
+        }
+        if (meta.dueDate) CONFIG.debts[k].dueDate = meta.dueDate;
       });
     }
   } catch (_) {}
@@ -1441,10 +1448,13 @@ async function saveDebt(key) {
 
   closeDebtEdit(key);
 
-  // Guardar metadatos de deuda (mínimos, fechas)
+  // Guardar metadatos de deuda (mínimos, fechas) — solo guardar minPayment > 0
   var meta = {};
   Object.keys(CONFIG.debts).forEach(function (k) {
-    meta[k] = { minPayment: CONFIG.debts[k].minPayment, dueDate: CONFIG.debts[k].dueDate };
+    meta[k] = {
+      minPayment: CONFIG.debts[k].minPayment || 0,
+      dueDate:    CONFIG.debts[k].dueDate    || ""
+    };
   });
   await SHEETS.saveConfig("debtMeta", JSON.stringify(meta), key + " meta actualizado");
   await persistAndRender(key + ": $" + old + " → $" + newBal + (notes ? ". " + notes : ""));
