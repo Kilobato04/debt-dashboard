@@ -139,10 +139,40 @@ var CALC = {
     return CONFIG.variableExpenses.reduce(function (s, e) { return s + (e.amount || 0); }, 0);
   },
 
-  // Total mínimos de deuda (separados de gastos de vida)
+  // Total mínimos actuales (mes actual, sin override)
   totalMinPayments: function () {
     return Object.values(CONFIG.debts)
       .reduce(function (s, d) { return s + (d.minPayment || 0); }, 0);
+  },
+
+  // Mínimo estimado automático para una deuda dado su saldo
+  // Opción B: estimación basada en tipo de deuda
+  estimatedMin: function (key, balance) {
+    var d = CONFIG.debts[key];
+    if (!d) return 0;
+    balance = (balance != null) ? balance : (d.balance || 0);
+    if (d.type === "revolving") {
+      // Revolving: interés mensual + 1% capital, mínimo 2% del saldo
+      var interes = balance * (d.rate / 100 / 12);
+      return Math.max(Math.round(interes + balance * 0.01), Math.round(balance * 0.02));
+    }
+    return d.minPayment || 0;  // installment y float: mínimo fijo del CONFIG
+  },
+
+  // Mínimos para un mes específico — Opción C: usa override manual si existe,
+  // si no usa el minPayment actual de CONFIG (que el usuario puede editar en Saldos)
+  totalMinPaymentsForMonth: function (monthId) {
+    var overrides = {};
+    if (typeof MONTHS_DEF !== "undefined") {
+      var m = MONTHS_DEF.find(function (x) { return x.id === monthId; });
+      overrides = m ? (m.minOverrides || {}) : {};
+    }
+    return Object.keys(CONFIG.debts).reduce(function (s, k) {
+      if (overrides[k] != null && overrides[k] !== "") {
+        return s + (parseFloat(overrides[k]) || 0);
+      }
+      return s + (CONFIG.debts[k].minPayment || 0);
+    }, 0);
   },
 
   // Ingreso mensual base según mes (YYYY-MM)
@@ -153,10 +183,17 @@ var CALC = {
     return nomina + vales + (CONFIG.income.otros || 0);
   },
 
-  // Excedente disponible para abono EXTRA a deuda
+  // Excedente disponible — usa mínimos del mes si hay overrides
   surplusForDebt: function (ym) {
     ym = ym || currentYM();
-    return this.monthlyIncome(ym) - this.totalFixed() - this.totalVariable() - this.totalMinPayments();
+    // Buscar el monthId correspondiente al ym
+    var monthId = null;
+    if (typeof MONTHS_DEF !== "undefined") {
+      var mDef = MONTHS_DEF.find(function (x) { return x.ym === ym; });
+      monthId = mDef ? mDef.id : null;
+    }
+    var mins = monthId ? this.totalMinPaymentsForMonth(monthId) : this.totalMinPayments();
+    return this.monthlyIncome(ym) - this.totalFixed() - this.totalVariable() - mins;
   },
 
   // Días hasta una fecha ISO
