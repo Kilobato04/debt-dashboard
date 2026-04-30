@@ -74,31 +74,37 @@ var SHEETS = {
     sheet = sheet || "audit_log";
     var self = this;
     return new Promise(function (resolve) {
-      var cb  = "cb_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+      var cb      = "cb_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+      var settled = false;   // evita doble resolve
+
+      function cleanup(success) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        // No eliminar window[cb] hasta después — GAS puede llamarlo
+        // levemente después del timeout. Lo limpiamos con un delay corto.
+        setTimeout(function () { delete window[cb]; }, 500);
+        var el = document.getElementById("jsonp_" + cb);
+        if (el) el.remove();
+        self._connected = success;
+        updateConnectionDot();
+      }
+
       var url = CONFIG.sheetApiBase +
         "?action=getHistory" +
         "&sheet="    + encodeURIComponent(sheet) +
         "&token="    + encodeURIComponent(CONFIG.appToken) +
         "&callback=" + cb;
 
-      // Timeout de seguridad
+      // Timeout generoso — GAS en cold start puede tardar 10-15s
       var timer = setTimeout(function () {
-        delete window[cb];
-        var el = document.getElementById("jsonp_" + cb);
-        if (el) el.remove();
-        self._connected = false;
-        updateConnectionDot();
+        cleanup(false);
         resolve({ success: false, data: [], error: "timeout" });
-      }, 8000);
+      }, 20000);
 
-      // Callback global que Sheets invocará
+      // Callback global que GAS invocará
       window[cb] = function (data) {
-        clearTimeout(timer);
-        delete window[cb];
-        var el = document.getElementById("jsonp_" + cb);
-        if (el) el.remove();
-        self._connected = true;
-        updateConnectionDot();
+        cleanup(true);
         resolve(data);
       };
 
@@ -107,11 +113,7 @@ var SHEETS = {
       script.id  = "jsonp_" + cb;
       script.src = url;
       script.onerror = function () {
-        clearTimeout(timer);
-        delete window[cb];
-        script.remove();
-        self._connected = false;
-        updateConnectionDot();
+        cleanup(false);
         resolve({ success: false, data: [], error: "load error" });
       };
       document.head.appendChild(script);
